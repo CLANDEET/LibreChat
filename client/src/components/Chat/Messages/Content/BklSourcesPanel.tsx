@@ -91,32 +91,101 @@ function sourceHasBimsLink(source: BklSource | null): boolean {
   return Boolean(source?.source?.bims_url || (typeof meta?.bims_url === 'string' && meta.bims_url));
 }
 
-function withImanageDetails(source: BklSource, details: Record<string, unknown>): BklSource {
+type ImanageDetails = Record<string, unknown>;
+
+const IMANAGE_DISPLAY_FIELDS = [
+  'edit_date',
+  'last_user',
+  'custom4',
+  'custom1_description',
+  'custom29_description',
+] as const;
+
+const IMANAGE_LINK_FIELDS = [
+  'imanage_url',
+  'imanage_preview_url',
+  'imanage_folder_url',
+  'bims_url',
+] as const;
+
+// doc_id → `/v1/imanage-links` 응답. PG `document_tags` 는 세션 중 바뀌지
+// 않으므로 문서당 한 번만 왕복하고, 동시 호출은 진행 중인 Promise 를
+// 공유한다 (패널 본문과 iM/BIMS 버튼이 같은 doc 을 동시에 찾는다).
+// 404(링크 없음)는 정상 응답이므로 null 로 캐시하고, 전송 실패만
+// 캐시하지 않아 다음 마운트에서 다시 시도한다.
+const imanageDetailsCache = new Map<string, ImanageDetails | null>();
+const imanageDetailsInflight = new Map<string, Promise<ImanageDetails | null>>();
+
+function fetchImanageDetails(docId: string): Promise<ImanageDetails | null> {
+  if (imanageDetailsCache.has(docId)) {
+    return Promise.resolve(imanageDetailsCache.get(docId) ?? null);
+  }
+  const pending = imanageDetailsInflight.get(docId);
+  if (pending) return pending;
+
+  const request = fetch(`/bkl/v1/imanage-links/${encodeURIComponent(docId)}`)
+    .then((r) => {
+      if (r.status === 404) return null;
+      if (!r.ok) throw new Error(`imanage-links ${r.status}`);
+      return r.json() as Promise<ImanageDetails>;
+    })
+    .then((details) => {
+      imanageDetailsCache.set(docId, details);
+      return details;
+    })
+    .catch(() => null)
+    .finally(() => {
+      imanageDetailsInflight.delete(docId);
+    });
+
+  imanageDetailsInflight.set(docId, request);
+  return request;
+}
+
+/**
+ * Merge a `/v1/imanage-links` response into a citation.
+ *
+ * Returns the ORIGINAL `source` object when the response adds nothing new.
+ * That identity stability is load-bearing: the enrichment effect below depends
+ * on `current`, which is memoised off `sources`, so handing back a fresh object
+ * for a no-op merge re-arms the effect and it re-fetches forever — 2026-09-01
+ * 서버 로그가 같은 doc_id 의 `GET /v1/imanage-links/... 200` 으로 도배됐다.
+ * 응답에 표시 메타 / 폴더 URL / bims_url 중 하나라도 빠져 있으면
+ * 이펙트의 skip 가드가 영영 참이 되지 않기 때문이다.
+ */
+function withImanageDetails(source: BklSource, details: ImanageDetails): BklSource {
+  const meta0 = (source.metadata?.[0] ?? {}) as Record<string, unknown>;
+  const src = (source.source ?? {}) as Record<string, unknown>;
+
+  // 메타데이터에는 file/preview URL 을 서로 폴백해 채우고, `source.source`
+  // 에는 응답에 실제로 실린 필드만 넣는다 (기존 병합 규칙 그대로).
+  const metaUpdates: Record<string, unknown> = {};
+  for (const field of IMANAGE_DISPLAY_FIELDS) {
+    if (details[field]) metaUpdates[field] = details[field];
+  }
+  const fileUrl = details.imanage_url ?? details.imanage_preview_url;
+  const previewUrl = details.imanage_preview_url ?? details.imanage_url;
+  if (fileUrl) metaUpdates.imanage_url = fileUrl;
+  if (previewUrl) metaUpdates.imanage_preview_url = previewUrl;
+  if (details.imanage_folder_url) metaUpdates.imanage_folder_url = details.imanage_folder_url;
+  if (details.bims_url) metaUpdates.bims_url = details.bims_url;
+
+  const srcUpdates: NonNullable<BklSource['source']> = {};
+  for (const field of IMANAGE_LINK_FIELDS) {
+    const value = details[field];
+    if (typeof value === 'string' && value) srcUpdates[field] = value;
+  }
+
+  const changed =
+    Object.entries(metaUpdates).some(([key, value]) => meta0[key] !== value) ||
+    Object.entries(srcUpdates).some(([key, value]) => src[key] !== value);
+  if (!changed) return source;
+
   const metadata = source.metadata?.length ? [...source.metadata] : [{}];
-  metadata[0] = {
-    ...(metadata[0] || {}),
-    ...Object.fromEntries(
-      ['edit_date', 'last_user', 'custom4', 'custom1_description', 'custom29_description']
-        .map((field) => [field, details[field]])
-        .filter(([, value]) => value),
-    ),
-    imanage_url: details.imanage_url ?? details.imanage_preview_url ?? metadata[0]?.imanage_url,
-    imanage_preview_url:
-      details.imanage_preview_url ?? details.imanage_url ?? metadata[0]?.imanage_preview_url,
-    imanage_folder_url: details.imanage_folder_url ?? metadata[0]?.imanage_folder_url,
-    bims_url: details.bims_url ?? metadata[0]?.bims_url,
-  };
+  metadata[0] = { ...meta0, ...metaUpdates } as BklSource['metadata'][number];
   return {
     ...source,
-    source: {
-      ...source.source,
-      imanage_url: (details.imanage_url as string) ?? source.source?.imanage_url,
-      imanage_preview_url:
-        (details.imanage_preview_url as string) ?? source.source?.imanage_preview_url,
-      imanage_folder_url:
-        (details.imanage_folder_url as string) ?? source.source?.imanage_folder_url,
-      bims_url: (details.bims_url as string) ?? source.source?.bims_url,
-    },
+    source: { ...source.source, ...srcUpdates },
     metadata,
   };
 }
@@ -316,20 +385,23 @@ export default function BklSourcesPanel({ onBack }: BklSourcesPanelProps = {}) {
     const docId = sourceDocId(current);
     if (!docId) return;
     let cancelled = false;
-    fetch(`/bkl/v1/imanage-links/${encodeURIComponent(docId)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((details) => {
-        if (cancelled || !details) return;
-        setSources((prev) => {
-          if (!prev) return prev;
-          const idx = active.n - 1;
-          if (!prev[idx]) return prev;
-          const next = [...prev];
-          next[idx] = withImanageDetails(prev[idx], details);
-          return next;
-        });
-      })
-      .catch(() => {});
+    fetchImanageDetails(docId).then((details) => {
+      if (cancelled || !details) return;
+      setSources((prev) => {
+        if (!prev) return prev;
+        const idx = active.n - 1;
+        const entry = prev[idx];
+        if (!entry) return prev;
+        const merged = withImanageDetails(entry, details);
+        // 병합이 아무것도 바꾸지 않으면 배열 identity 를 그대로 둔다 —
+        // 새 배열을 만들면 `current` 메모가 재계산되어 이 이펙트가 다시
+        // 켜지고, 그대로 무한 재요청이 된다.
+        if (merged === entry) return prev;
+        const next = [...prev];
+        next[idx] = merged;
+        return next;
+      });
+    });
     return () => {
       cancelled = true;
     };
@@ -501,18 +573,16 @@ function ExternalSystemButtons({ source }: { source: BklSource | null }) {
     // PG document_tags 에 iManage 검색 링크(imanage_preview_url)가 전건
     // 채워져 있으므로, Qdrant payload 값은 임시 표시용이고 API 응답(PG)이
     // 항상 최종 값으로 덮어쓴다 — 조건부 skip 없이 항상 호출 (2026-08-26).
+    // 왕복은 `fetchImanageDetails` 의 doc_id 캐시가 문서당 1회로 묶는다.
     const docId = typeof meta?.doc_id === 'string' && meta.doc_id ? (meta.doc_id as string) : null;
     if (!docId) return;
     let cancelled = false;
-    fetch(`/bkl/v1/imanage-links/${encodeURIComponent(docId)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
-        const nextFile = data.imanage_url ?? data.imanage_preview_url ?? null;
-        if (nextFile) setFileUrl(nextFile);
-        if (data.bims_url) setBimsUrl(data.bims_url);
-      })
-      .catch(() => {});
+    fetchImanageDetails(docId).then((data) => {
+      if (cancelled || !data) return;
+      const nextFile = (data.imanage_url ?? data.imanage_preview_url ?? null) as string | null;
+      if (nextFile) setFileUrl(nextFile);
+      if (typeof data.bims_url === 'string' && data.bims_url) setBimsUrl(data.bims_url);
+    });
     return () => {
       cancelled = true;
     };
