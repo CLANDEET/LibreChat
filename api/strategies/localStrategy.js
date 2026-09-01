@@ -18,32 +18,9 @@ const { getBalanceConfig } = require('@librechat/api');
 const { getAppConfig } = require('~/server/services/Config');
 const { getBklMaintenanceConfig } = require('~/server/services/Config/bklMaintenance');
 const crypto = require('crypto');
-const mongoose = require('mongoose');
+const { persistBklFields } = require('~/server/services/bklSso');
 
 const BKL_AUTH_URL = process.env.BKL_AUTH_URL || 'https://nb.bkl.co.kr/apis/identity/auth/login';
-
-/**
- * Persist BIMS fields directly via mongoose, bypassing Mongoose strict mode.
- *
- * LibreChat 의 user schema 에는 bkl_* 필드 정의 안 됨. updateUser() 가
- * findByIdAndUpdate({runValidators:true}) 쓰는데 strict mode default 라 schema
- * 에 없는 필드는 silently drop. 그래서 mongoose Model 직접 호출 + strict:false.
- *
- * @param {string|ObjectId} userId
- * @param {Object} bklFields  { bkl_sid, bkl_user_id, bkl_user_nm, ... }
- */
-async function persistBklFields(userId, bklFields) {
-  const User = mongoose.models.User;
-  if (!User) {
-    logger.error('[BKL Login] mongoose.models.User not available');
-    return null;
-  }
-  return await User.findByIdAndUpdate(
-    userId,
-    { $set: bklFields },
-    { strict: false, new: true },
-  ).lean();
-}
 
 async function passportLogin(req, email_or_id, password, done) {
   try {

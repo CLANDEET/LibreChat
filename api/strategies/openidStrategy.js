@@ -20,6 +20,7 @@ const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { findUser, createUser, updateUser } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
 const getLogStores = require('~/cache/getLogStores');
+const { linkBimsIdentity } = require('~/server/services/bklSso');
 
 /**
  * @typedef {import('openid-client').ClientMetadata} ClientMetadata
@@ -632,6 +633,17 @@ function createOpenIDCallback(existingUsersOnly) {
   return async (tokenset, done) => {
     try {
       const user = await processOpenIDAuth(tokenset, existingUsersOnly);
+
+      /* BKL: OIDC 인증만으로는 BIMS sid 를 알 수 없다. 인증 직후 BIMS 로그인
+       * API 로 sid 를 받아 user 문서에 반영해야 bklIdentityHeaders() 가
+       * X-BKL-User-Sid 를 실어 보내고 ai-api 의 사건별 ACL 이 동작한다.
+       * 연결 실패 시 로그인을 거부한다 — sid 없이 통과시키면 "로그인은 되는데
+       * 검색 결과가 0건" 이라는 더 나쁜 상태가 된다. */
+      const bimsLink = await linkBimsIdentity(tokenset, user);
+      if (!bimsLink.ok) {
+        return done(null, false, { message: bimsLink.message });
+      }
+
       done(null, user);
     } catch (err) {
       if (err.message === 'Email domain not allowed') {
