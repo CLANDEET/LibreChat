@@ -15,9 +15,11 @@ import { stripDisplayExtension } from './fileTypeIcon';
 import type { BklSource } from '~/components/Chat/Messages/Content/ChunkModal';
 
 // useConversationCitations 와 동일 포맷 (스트리밍 변환 링크 + 원문 낱개/묶음).
-const CITE_LINK_RE = /\[\[(\d{1,2})\]\]\([^)]*\)/g;
+// 자릿수 제한 없음 — 세 자리 인용번호가 치환에서 누락되던 문제 (2026-09-01).
+// 매핑 실패한 번호는 replaceCitationsWithFilenames 가 [N] 그대로 남긴다.
+const CITE_LINK_RE = /\[\[(\d+)\]\]\([^)]*\)/g;
 // `[N](url)` 형태의 일반 마크다운 링크를 건드리지 않도록 `(?!\()` 가드.
-const CITE_PLAIN_RE = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\](?!\()/g;
+const CITE_PLAIN_RE = /\[(\d+(?:\s*,\s*\d+)*)\](?!\()/g;
 
 /** 출처 메타에서 표시용 파일명 추출 — 『파일명』 프리픽스·OCR .md 제거. */
 export function citationFileName(source: BklSource | undefined | null): string {

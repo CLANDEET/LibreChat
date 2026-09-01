@@ -55,6 +55,24 @@ describe('replaceCitationsWithFilenames', () => {
     expect(replaceCitationsWithFilenames('근거 [1]', null)).toBe('근거 [1]');
   });
 
+  it('replaces three-digit citations too', () => {
+    // `\d{1,2}` 였을 때 [120] 이후가 파일명으로 안 바뀌고 그대로 인쇄됐다.
+    const many = Array.from({ length: 126 }, (_, i) => src(`문서${i + 1}.msg`));
+    expect(replaceCitationsWithFilenames('기속행위 [124] .', many)).toBe(
+      '기속행위 『문서124.msg』 .',
+    );
+    expect(replaceCitationsWithFilenames('근거 [120, 126]', many)).toBe(
+      '근거 『문서120.msg』『문서126.msg』',
+    );
+    expect(replaceCitationsWithFilenames('링크 [[125]](https://x)', many)).toBe(
+      '링크 『문서125.msg』',
+    );
+  });
+
+  it('leaves a four-digit year alone when no such source exists', () => {
+    expect(replaceCitationsWithFilenames('판결 [2024] 참고', SOURCES)).toBe('판결 [2024] 참고');
+  });
+
   it('does not touch normal markdown links like [1](url)', () => {
     expect(replaceCitationsWithFilenames('각주 [1](https://x)', SOURCES)).toBe(
       '각주 [1](https://x)',

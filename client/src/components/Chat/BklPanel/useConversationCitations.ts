@@ -16,10 +16,14 @@ import type { BklSource } from '~/components/Chat/Messages/Content/ChunkModal';
  * `[[N]](url)` 링크 + 낱개 `[N]` + 묶음 `[1, 2, 3]` 모두 수용).
  */
 
-// [[N]](url) — 스트리밍 인용 변환기가 저장하는 링크 포맷.
-const CITE_LINK_RE = /\[\[(\d{1,2})\]\]\([^)]*\)/g;
+// 자릿수를 제한하지 않는다. 전에는 `\d{1,2}` 였는데, 검색 결과가 많은 답변은
+// 인용번호가 세 자리까지 가서 [120] 이후가 통째로 안 잡혔다. 본문 인용칩은
+// remarkBklCitation 이 `\[(\d+)\]` 로 따로 파싱하므로 칩은 멀쩡히 뜨는데
+// 패널 목록에서만 사라져, 정작 중요한 인용이 빠져 보였다 (2026-09-01 제보).
+// 범위를 벗어난 번호는 아래에서 sources[n-1] 조회 실패로 걸러진다.
+const CITE_LINK_RE = /\[\[(\d+)\]\]\([^)]*\)/g;
 // [N] / [1, 2, 3] — 변환 전 원문·딥씽킹 경로 포맷 (쉼표 묶음 허용).
-const CITE_PLAIN_RE = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
+const CITE_PLAIN_RE = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
 
 /** 답변 텍스트에서 실제 인용된 번호 집합을 추출 (숫자 오름차순, 중복 제거). */
 export function parseCitedNumbers(text: string): number[] {
