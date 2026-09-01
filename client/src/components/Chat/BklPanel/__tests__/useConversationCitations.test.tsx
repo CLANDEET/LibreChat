@@ -77,9 +77,30 @@ describe('parseCitedNumbers', () => {
     expect(parseCitedNumbers('혼합 [[2]](u) 와 [5]')).toEqual([2, 5]);
   });
 
-  it('연도 [2024] 같은 3자리 이상은 무시하고, 빈 텍스트는 빈 배열', () => {
-    expect(parseCitedNumbers('판결 [2024] 참고')).toEqual([]);
+  it('세 자리 이상 인용번호도 추출한다', () => {
+    // 예전에는 `\d{1,2}` 라 [120] 이후가 통째로 안 잡혀, 본문에는 인용칩이
+    // 떠 있는데 패널 목록에서만 사라졌다 (2026-09-01 제보).
+    expect(parseCitedNumbers('기속행위에 해당합니다 [124] .')).toEqual([124]);
+    expect(parseCitedNumbers('근거는 [53] 과 [120, 123, 126] 입니다')).toEqual([
+      53, 120, 123, 126,
+    ]);
+    expect(parseCitedNumbers('링크 [[125]](https://x/y) 형태')).toEqual([125]);
+  });
+
+  it('빈 텍스트는 빈 배열', () => {
     expect(parseCitedNumbers('')).toEqual([]);
+  });
+
+  it('연도 [2024] 는 번호로는 잡히되 출처가 없어 집계에서 빠진다', () => {
+    // 자릿수로 거르면 세 자리 인용까지 같이 죽는다. 실제 판정은 sources[n-1]
+    // 조회가 하므로, 파서는 구조만 보고 넘긴다.
+    expect(parseCitedNumbers('판결 [2024] 참고')).toEqual([2024]);
+
+    (window as unknown as { __bklSources: Record<string, unknown> }).__bklSources = {
+      y1: [makeSource('계약서.pdf')],
+    };
+    const { result } = setup([msg({ messageId: 'y1', text: '판결 [2024] 참고 [1]' })]);
+    expect(result.current.turns[0].chunks.map((c) => c.n)).toEqual([1]);
   });
 
   it('rid 주석·파일명 괄호가 섞인 실제 답변 형태에서도 동작한다', () => {
@@ -156,6 +177,31 @@ describe('useConversationCitations — API 미배포 폴백', () => {
     expect(result.current.turns).toHaveLength(1);
     expect(result.current.turns[0].chunks.map((c) => c.n)).toEqual([1]);
     expect(result.current.files[0].fileName).toBe('감독규정.pdf');
+  });
+
+  it('세 자리 인용이 섞인 답변에서 전부 집계된다 — 회귀 재현', () => {
+    // 제보 화면: 답변2 가 [53] 과 [120] [123] [124] [125] [126] 을 인용했는데
+    // 패널에는 50·52·53 만 떴다. 본문 인용칩은 remarkBklCitation 이 `\d+` 로
+    // 따로 파싱해 멀쩡히 뜨는 탓에 패널만 빠진 게 눈에 띄었다.
+    const sources = Array.from({ length: 126 }, (_, i) => makeSource(`문서${i + 1}.msg`));
+    (window as unknown as { __bklSources: Record<string, unknown> }).__bklSources = {
+      a3: sources,
+    };
+    const long = msg({
+      messageId: 'a3',
+      text:
+        '이어 착수연기신청 반려처분을 내렸습니다 [53] . 기속행위에 해당합니다 [124] .\n' +
+        '청구인에게 귀책사유가 있습니다 [120, 125] . 보완 기회 [[126]](https://x/y) .',
+    });
+    const { result } = setup([userMsg, long]);
+    expect(result.current.turns[0].chunks.map((c) => c.n)).toEqual([53, 120, 124, 125, 126]);
+    expect(result.current.files.map((f) => f.fileName)).toEqual([
+      '문서53.msg',
+      '문서120.msg',
+      '문서124.msg',
+      '문서125.msg',
+      '문서126.msg',
+    ]);
   });
 
   it('출처가 어디에도 없으면 빈 결과 (isLoading 아님)', () => {
