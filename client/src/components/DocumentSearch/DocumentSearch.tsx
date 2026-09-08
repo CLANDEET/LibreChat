@@ -38,7 +38,7 @@ import FilterBar, {
 const DEFAULT_TOP_K = 100;
 const DEFAULT_CHUNKS_PER_DOC = 1000;
 const PAGE_SIZE = 10;
-const DEFAULT_APP_TITLE = 'BKL DB AI';
+const DEFAULT_APP_TITLE = 'BKL Prism';
 
 function getAppTitle(): string {
   return localStorage.getItem(LocalStorageKeys.APP_TITLE) || DEFAULT_APP_TITLE;

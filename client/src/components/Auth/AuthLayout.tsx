@@ -60,13 +60,27 @@ function AuthLayout({
     <div className="relative flex min-h-screen flex-col bg-white dark:bg-gray-900">
       <Banner />
       <BlinkAnimation active={isFetching}>
-        {/* BKL: 공식 로고 (teal 글자·투명 배경) — 흰 로그인 배경에 자연스럽게 blend */}
-        <div className="mt-8 flex h-12 w-full items-center justify-center">
-          <img
-            src="assets/bkl-logo-brand.png"
-            className="h-full w-auto object-contain"
-            alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
-          />
+        {/* BKL Prism 로그인 락업. 법인 마크(teal 글자·투명 배경)는 그대로 두고
+            서비스명 Prism 만 스펙트럼으로 얹는다 — 브랜드 정의의 워드마크가
+            `BKL`(본문색) + `Prism`(그라디언트) 구성이라 로고가 앞의 BKL 을
+            대신한다. 아래 스펙트럼 선은 이름의 유래(백색광→스펙트럼)를
+            한 줄로 보여주는 유일한 장식이다. */}
+        <div className="mt-8 flex w-full flex-col items-center gap-3">
+          <div className="flex h-12 items-end gap-2.5">
+            <img
+              src="assets/bkl-logo-brand.png"
+              className="h-full w-auto object-contain"
+              alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'BKL Prism' })}
+            />
+            <span
+              aria-hidden="true"
+              className="prism-spectrum-text pb-0.5 text-3xl font-semibold leading-none tracking-tight"
+            >
+              Prism
+            </span>
+          </div>
+          <hr className="prism-rule w-40 max-w-[70vw]" aria-hidden="true" />
+          <p className="text-sm text-text-secondary">흩어진 지식을, 하나의 스펙트럼으로.</p>
         </div>
       </BlinkAnimation>
       <DisplayError />

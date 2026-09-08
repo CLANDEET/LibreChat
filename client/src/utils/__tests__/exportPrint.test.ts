@@ -88,7 +88,7 @@ describe('buildPrintHtml', () => {
       metaLines: ['대화 ID: abc'],
       blocks: [
         { sender: 'User', isUser: true, html: '<p>질문</p>' },
-        { sender: 'BKL DB AI', isUser: false, html: '<table><tr><td>표</td></tr></table>' },
+        { sender: 'BKL Prism', isUser: false, html: '<table><tr><td>표</td></tr></table>' },
       ],
     });
     expect(html).toContain('<title>내보내기.pdf</title>');

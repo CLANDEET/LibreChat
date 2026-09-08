@@ -152,7 +152,7 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
           {/* BKL: greeting 옆 로봇 대신 BKL 로고. */}
           <div className={`relative flex size-10 items-center justify-center ${textHasMultipleLines ? 'mb-2' : ''}`}>
             <span className="flex size-10 items-center justify-center overflow-hidden rounded-full bg-black">
-              <img src="/assets/bkl-logo.png" alt="BKL" className="w-8 object-contain" />
+              <img src="/assets/bkl-logo.png" alt="BKL Prism" className="w-8 object-contain" />
             </span>
             {startupConfig?.showBirthdayIcon && (
               <TooltipAnchor
@@ -196,9 +196,19 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
             />
           )}
         </div>
-        {description && (
+        {description ? (
           <div className="animate-fadeIn mt-4 max-w-md text-center text-sm font-normal text-text-primary">
             {description}
+          </div>
+        ) : (
+          /* 에이전트 설명이 없는 기본 대기화면에만 서비스 태그라인을 둔다.
+             인사말만 덩그러니 뜨던 자리라 브랜드를 얹기에 자연스럽고,
+             설명이 있는 화면에서는 두 줄이 겹치므로 내보내지 않는다. */
+          <div className="animate-fadeIn mt-3 flex flex-col items-center gap-2">
+            <hr className="prism-rule w-24" aria-hidden="true" />
+            <p className="text-center text-sm text-text-secondary">
+              흩어진 지식을, 하나의 스펙트럼으로.
+            </p>
           </div>
         )}
       </div>
