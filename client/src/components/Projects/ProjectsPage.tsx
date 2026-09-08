@@ -38,7 +38,7 @@ import type { ProjectDocument } from '~/data-provider/Projects';
 import { clearMessagesCache, cn } from '~/utils';
 import { stripDisplayExtension } from '~/utils/fileTypeIcon';
 
-const DEFAULT_APP_TITLE = 'BKL DB AI';
+const DEFAULT_APP_TITLE = 'BKL Prism';
 
 /** 프로젝트(Vault류) 페이지 — 좌측 프로젝트 목록 + 우측 문서 테이블. */
 const ProjectsPage: React.FC = () => {

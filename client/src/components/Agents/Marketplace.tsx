@@ -23,7 +23,7 @@ interface AgentMarketplaceProps {
   className?: string;
 }
 
-const DEFAULT_APP_TITLE = 'BKL DB AI';
+const DEFAULT_APP_TITLE = 'BKL Prism';
 
 function getAppTitle(): string {
   return localStorage.getItem(LocalStorageKeys.APP_TITLE) || DEFAULT_APP_TITLE;

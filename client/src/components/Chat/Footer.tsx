@@ -27,7 +27,7 @@ function Footer({ className }: { className?: string }) {
   const mainContentParts = (
     typeof config?.customFooter === 'string'
       ? config.customFooter
-      : 'bkl DB AI ' + Constants.VERSION
+      : 'BKL Prism ' + Constants.VERSION
   ).split('|');
 
   useEffect(() => {
