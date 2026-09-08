@@ -1,7 +1,7 @@
 import { ThemeSelector } from '@librechat/client';
 import { TStartupConfig } from 'librechat-data-provider';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
-import { BKL_TAGLINE } from '~/components/Bkl/brand';
+import { BKL_APP_TITLE, BKL_TAGLINE } from '~/components/Bkl/brand';
 import { TranslationKeys, useLocalize } from '~/hooks';
 import SocialLoginRender from './SocialLoginRender';
 import { BlinkAnimation } from './BlinkAnimation';
@@ -71,7 +71,7 @@ function AuthLayout({
             <img
               src="assets/bkl-logo-brand.png"
               className="h-full w-auto object-contain"
-              alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'BKL Prism' })}
+              alt={localize('com_ui_logo', { 0: BKL_APP_TITLE })}
             />
             <span
               aria-hidden="true"

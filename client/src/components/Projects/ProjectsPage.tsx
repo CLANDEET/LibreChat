@@ -9,7 +9,8 @@ import {
   useToastContext,
 } from '@librechat/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { LocalStorageKeys, QueryKeys } from 'librechat-data-provider';
+import { QueryKeys } from 'librechat-data-provider';
+import { BKL_APP_TITLE } from '~/components/Bkl/brand';
 import {
   ExternalLink,
   Folder,
@@ -38,8 +39,6 @@ import type { ProjectDocument } from '~/data-provider/Projects';
 import { clearMessagesCache, cn } from '~/utils';
 import { stripDisplayExtension } from '~/utils/fileTypeIcon';
 
-const DEFAULT_APP_TITLE = 'BKL Prism';
-
 /** 프로젝트(Vault류) 페이지 — 좌측 프로젝트 목록 + 우측 문서 테이블. */
 const ProjectsPage: React.FC = () => {
   const localize = useLocalize();
@@ -50,11 +49,7 @@ const ProjectsPage: React.FC = () => {
   const { navVisible, setNavVisible } = useOutletContext<ContextType>();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
 
-  useDocumentTitle(
-    `${localize('com_nav_projects')} | ${
-      localStorage.getItem(LocalStorageKeys.APP_TITLE) || DEFAULT_APP_TITLE
-    }`,
-  );
+  useDocumentTitle(`${localize('com_nav_projects')} | ${BKL_APP_TITLE}`);
 
   const { data: projects = [], isLoading, isError, error, refetch } = useProjects();
   const [selectedId, setSelectedId] = useState<string | null>(null);
