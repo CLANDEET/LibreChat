@@ -1,6 +1,7 @@
 import { ThemeSelector } from '@librechat/client';
 import { TStartupConfig } from 'librechat-data-provider';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
+import { BKL_TAGLINE } from '~/components/Bkl/brand';
 import { TranslationKeys, useLocalize } from '~/hooks';
 import SocialLoginRender from './SocialLoginRender';
 import { BlinkAnimation } from './BlinkAnimation';
@@ -80,7 +81,7 @@ function AuthLayout({
             </span>
           </div>
           <hr className="prism-rule w-40 max-w-[70vw]" aria-hidden="true" />
-          <p className="text-sm text-text-secondary">흩어진 지식을, 하나의 스펙트럼으로.</p>
+          <p className="text-sm text-text-secondary">{BKL_TAGLINE}</p>
         </div>
       </BlinkAnimation>
       <DisplayError />
