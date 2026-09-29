@@ -193,13 +193,16 @@ export function useBklAnswerHyperlinks(
   enabled: boolean,
 ): HyperlinkMap | null {
   const hasMention = enabled && text.indexOf('『') !== -1;
+  const sourcesTick = useSourcesTick(messageId, hasMention);
   const rid = useMemo(
     () => (hasMention ? resolveRid(messageId, text, message) : null),
     // text 가 바뀔 때마다 rid 를 다시 찾는다 — 스트리밍 끝에 rid 주석이 붙는다.
-    [hasMention, messageId, text, message],
+    // sourcesTick: 본문 주석이 없는 경로는 window.__bklRids 가 출처 캐시와
+    // 함께 채워지므로 그 이벤트에도 다시 찾는다 (값 자체는 쓰지 않는다).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasMention, messageId, text, message, sourcesTick],
   );
   const [ridMap, setRidMap] = useState<HyperlinkMap | null>(null);
-  const sourcesTick = useSourcesTick(messageId, hasMention);
 
   useEffect(() => {
     if (!rid) return;
