@@ -147,11 +147,13 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
     >
       <div ref={contentRef} className="flex flex-col items-center gap-0 p-2">
         <div
-          className={`flex ${textHasMultipleLines ? 'flex-col' : 'flex-col md:flex-row'} items-center justify-center gap-2`}
+          className={`flex ${textHasMultipleLines ? 'flex-col' : 'flex-col md:flex-row'} items-center justify-center gap-4`}
         >
           {/* BKL: greeting 옆 로봇 대신 BKL 로고. */}
-          <div className={`relative flex size-10 items-center justify-center ${textHasMultipleLines ? 'mb-2' : ''}`}>
-            <span className="flex size-10 items-center justify-center overflow-hidden rounded-full bg-black">
+          <div
+            className={`relative flex size-10 items-center justify-center ${textHasMultipleLines ? 'mb-2' : ''}`}
+          >
+            <span className="flex size-10 items-center justify-center overflow-hidden rounded-full bg-prism-teal">
               <img src="/assets/bkl-logo.png" alt="BKL Prism" className="w-8 object-contain" />
             </span>
             {startupConfig?.showBirthdayIcon && (

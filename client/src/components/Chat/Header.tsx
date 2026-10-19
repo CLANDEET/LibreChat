@@ -72,10 +72,7 @@ function Header() {
                   className="flex h-9 items-center gap-2 rounded-xl border border-border-light bg-presentation px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-active-alt"
                   onClick={handleHomeClick}
                 >
-                  <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-black">
-                    <img src="/assets/bkl-logo.png" alt="" className="w-5 object-contain" />
-                  </span>
-                  <PrismWordmark className="hidden sm:inline" />
+                  <PrismWordmark className="text-[15px]" />
                 </button>
               </motion.div>
             )}

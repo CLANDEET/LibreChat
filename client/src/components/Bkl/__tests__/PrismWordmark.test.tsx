@@ -1,33 +1,35 @@
 import { render, screen } from '@testing-library/react';
-import PrismWordmark from '../PrismWordmark';
+import PrismWordmark, {
+  BKL_PRISM_WORDMARK_DARK_SRC,
+  BKL_PRISM_WORDMARK_SRC,
+} from '../PrismWordmark';
 
 /**
- * 워드마크는 사이드바·헤더에서 같은 표기여야 하고, 그라디언트 때문에 `Prism`
- * 이 별도 span 으로 쪼개져 있다. 스크린리더가 "BKL" 과 "Prism" 을 따로 읽지
- * 않도록 aria-label 로 한 덩어리를 만들어 둔 상태라, 그 구조가 깨지면
- * 접근성만 조용히 나빠지고 화면상으로는 티가 안 난다.
+ * 워드마크는 사이드바·헤더·로그인에서 같은 로고 이미지여야 한다. 라이트/다크
+ * 이미지 두 장을 쓰지만 보조기술에는 "BKL Prism" 한 덩어리로만 읽혀야 한다 —
+ * 각 img 에 alt 를 주면 두 번 읽히고, 아무것도 안 주면 로고가 사라진다.
  */
 describe('PrismWordmark', () => {
   it('보조기술에는 "BKL Prism" 한 덩어리로 노출된다', () => {
     render(<PrismWordmark />);
-    expect(screen.getByLabelText('BKL Prism')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'BKL Prism' })).toBeInTheDocument();
   });
 
-  it('화면에는 BKL 과 Prism 이 이어져 보인다', () => {
+  it('라이트/다크 로고 이미지를 모두 담고, 개별 img 는 읽히지 않는다', () => {
     const { container } = render(<PrismWordmark />);
-    expect(container.textContent).toBe('BKL Prism');
+    const imgs = Array.from(container.querySelectorAll('img'));
+    expect(imgs.map((i) => i.getAttribute('src'))).toEqual([
+      BKL_PRISM_WORDMARK_SRC,
+      BKL_PRISM_WORDMARK_DARK_SRC,
+    ]);
+    expect(imgs.every((i) => i.getAttribute('alt') === '')).toBe(true);
+    expect(imgs[0].className).toContain('dark:hidden');
+    expect(imgs[1].className).toContain('dark:block');
   });
 
-  it('Prism 에만 스펙트럼 그라디언트가 붙는다', () => {
-    const { container } = render(<PrismWordmark />);
-    const gradient = container.querySelector('.prism-spectrum-text');
-    expect(gradient?.textContent).toBe('Prism');
-    // BKL 까지 색이 먹으면 브랜드 정의(BKL=본문색)와 어긋난다.
-    expect(container.textContent?.startsWith('BKL ')).toBe(true);
-  });
-
-  it('전달한 className 을 유지한다 — 사이드바가 truncate 를 얹는다', () => {
-    render(<PrismWordmark className="truncate" />);
-    expect(screen.getByLabelText('BKL Prism')).toHaveClass('truncate');
+  it('높이는 글꼴 크기를 따른다 — 호출부가 font-size 로 크기를 정한다', () => {
+    const { container } = render(<PrismWordmark className="text-4xl" />);
+    expect(screen.getByRole('img', { name: 'BKL Prism' })).toHaveClass('text-4xl');
+    container.querySelectorAll('img').forEach((i) => expect(i.className).toContain('h-[1em]'));
   });
 });

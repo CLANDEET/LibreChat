@@ -158,7 +158,7 @@ export default function BklFeatureCarousel() {
             )}
           >
             <div className="flex items-center gap-2 text-text-primary">
-              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-prism-teal/10 text-prism-teal">
                 {f.icon}
               </span>
               <h3 className="truncate text-sm font-semibold">{f.title}</h3>

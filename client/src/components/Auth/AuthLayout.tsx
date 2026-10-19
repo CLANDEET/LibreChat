@@ -65,14 +65,9 @@ function AuthLayout({
     <div className="relative flex min-h-screen flex-col bg-white dark:bg-gray-900">
       <Banner />
       <BlinkAnimation active={isFetching}>
-        {/* BKL Prism 로그인 락업 — 사이드바·헤더와 같은 텍스트 워드마크를 쓴다.
-            법인 마크 이미지를 'Prism' 글자 옆에 세웠을 때 로고의 글자 베이스라인이
-            이미지 경계와 달라 정렬이 눈에 띄게 어긋났다. 둘을 한 줄의 텍스트로
-            두면 베이스라인이 하나라 어긋날 여지가 없고, 표기도 다른 화면과 같아진다.
-            아래 스펙트럼 선은 이름의 유래(백색광→스펙트럼)를 보여주는 유일한 장식이다. */}
+        {/* BKL Prism 로그인 락업 — 사이드바·헤더와 같은 로고 이미지 워드마크. */}
         <div className="mt-8 flex w-full flex-col items-center gap-3">
-          <PrismWordmark className="text-4xl font-semibold leading-none tracking-tight text-black dark:text-white" />
-          <hr className="prism-rule w-40 max-w-[70vw]" aria-hidden="true" />
+          <PrismWordmark className="text-4xl leading-none" />
           <p className="text-sm text-text-secondary">{BKL_TAGLINE}</p>
         </div>
       </BlinkAnimation>
