@@ -560,26 +560,41 @@ const ProjectDetailPanel: React.FC<{
 };
 
 // doc_id → iManage 링크 lazy 조회 캐시 (ResultCard 와 같은 엔드포인트)
-const imanageLinksCache = new Map<string, string | null>();
+// 상태코드를 같이 기억한다 — 403(권한) / 404(링크·메타데이터 없음) / 기타 실패를
+// 사용자에게 구분해서 알려야 한다 (2026-10-19 KM팀: "링크를 찾지 못했습니다" 하나로
+// 데이터 결손과 권한 문제가 섞여 보고됐다).
+type ImanageLinkResult = { url: string | null; status: number | null };
+const imanageLinksCache = new Map<string, ImanageLinkResult>();
 
-async function fetchImanageFileUrl(docId: string): Promise<string | null> {
-  if (imanageLinksCache.has(docId)) {
-    return imanageLinksCache.get(docId) ?? null;
+async function fetchImanageFileUrl(docId: string): Promise<ImanageLinkResult> {
+  const cached = imanageLinksCache.get(docId);
+  if (cached) {
+    return cached;
   }
+  let result: ImanageLinkResult;
   try {
     const resp = await fetch(`/bkl/v1/imanage-links/${encodeURIComponent(docId)}`);
     if (!resp.ok) {
-      imanageLinksCache.set(docId, null);
-      return null;
+      result = { url: null, status: resp.status };
+    } else {
+      const data = await resp.json();
+      result = { url: data.imanage_url ?? data.imanage_preview_url ?? null, status: resp.status };
     }
-    const data = await resp.json();
-    const url = data.imanage_url ?? data.imanage_preview_url ?? null;
-    imanageLinksCache.set(docId, url);
-    return url;
   } catch {
-    imanageLinksCache.set(docId, null);
-    return null;
+    result = { url: null, status: null };
   }
+  imanageLinksCache.set(docId, result);
+  return result;
+}
+
+function imanageLinkFailureMessage(status: number | null): string {
+  if (status === 403) {
+    return '이 문서에 대한 접근 권한이 없습니다.';
+  }
+  if (status === 404) {
+    return 'iManage 링크 정보가 없습니다.';
+  }
+  return 'iManage 링크 조회에 실패했습니다.';
 }
 
 const ProjectDocRow: React.FC<{
@@ -597,12 +612,15 @@ const ProjectDocRow: React.FC<{
       return;
     }
     setOpening(true);
-    const url = await fetchImanageFileUrl(doc.doc_id);
+    const { url, status } = await fetchImanageFileUrl(doc.doc_id);
     setOpening(false);
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer');
     } else {
-      showToast({ message: 'iManage 링크를 찾지 못했습니다', status: 'warning' });
+      showToast({
+        message: imanageLinkFailureMessage(status),
+        status: status === 404 ? 'warning' : 'error',
+      });
     }
   };
 
