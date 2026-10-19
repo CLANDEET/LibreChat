@@ -153,9 +153,12 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
           <div
             className={`relative flex size-10 items-center justify-center ${textHasMultipleLines ? 'mb-2' : ''}`}
           >
-            <span className="flex size-10 items-center justify-center overflow-hidden rounded-full bg-prism-teal">
-              <img src="/assets/bkl-logo.png" alt="BKL Prism" className="w-8 object-contain" />
-            </span>
+            {/* 원형 통 이미지라 배경색 없이 그대로 노출 (배경을 입히면 텍스트와 색이 어긋남). */}
+            <img
+              src="/assets/bkl-mark-circle.png"
+              alt="BKL Prism"
+              className="size-10 rounded-full object-contain"
+            />
             {startupConfig?.showBirthdayIcon && (
               <TooltipAnchor
                 className="absolute bottom-[27px] right-2"
