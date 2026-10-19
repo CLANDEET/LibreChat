@@ -70,9 +70,11 @@ function Footer({ className }: { className?: string }) {
     Boolean,
   );
 
-  // BKL Prism: 버전 · 태그라인 · 스펙트럼 띠 3층. 예전에는 대기화면 인사말
-  // 아래에 태그라인이 따로 있어 같은 화면에서 브랜드 요소가 두 군데로
-  // 갈라졌다. 버전 줄 아래로 모아 한 덩어리로 읽히게 한다.
+  // BKL Prism: 버전 · 태그라인 2층. 예전에는 대기화면 인사말 아래에
+  // 태그라인이 따로 있어 같은 화면에서 브랜드 요소가 두 군데로 갈라졌다.
+  // 버전 줄 아래로 모아 한 덩어리로 읽히게 한다. 스펙트럼 띠는 2026-10-19
+  // 디자인 피드백으로 뺐다 (새 로고가 네이비→틸 단일 그라디언트라 보라·앰버
+  // 띠와 충돌).
   //
   // `className` 은 공유 보기(ShareView)가 넘기는 값이라 바깥 래퍼가 아니라
   // 버전 줄에만 적용한다 — 래퍼에 얹으면 3층이 가로로 펴진다.
@@ -104,7 +106,6 @@ function Footer({ className }: { className?: string }) {
           })}
         </div>
         <p className="text-[11px] leading-none text-text-secondary">{BKL_TAGLINE}</p>
-        <hr className="prism-rule w-24" aria-hidden="true" />
       </div>
     </div>
   );

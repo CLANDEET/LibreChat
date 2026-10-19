@@ -109,6 +109,8 @@ module.exports = {
         'surface-tertiary': 'var(--surface-tertiary)',
         'surface-tertiary-alt': 'var(--surface-tertiary-alt)',
         'surface-dialog': 'var(--surface-dialog)',
+        // BKL Prism 로고 틸 (2026-10-19). 리터럴로 두어 /10 같은 알파 변형이 된다.
+        'prism-teal': '#00b7be',
         'surface-submit': 'var(--surface-submit)',
         'surface-submit-hover': 'var(--surface-submit-hover)',
         'surface-destructive': 'var(--surface-destructive)',
