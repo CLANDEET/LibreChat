@@ -1,6 +1,12 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { parseDateRange, getDb, loadConversationMessages } = require('./helpers');
-const { isOrgApiEnabled, orgSyncFilter, syncUserOrg } = require('~/server/services/bklOrg');
+const {
+  isOrgApiEnabled,
+  orgSyncFilter,
+  syncUserOrg,
+  inspectAndSyncUserOrg,
+} = require('~/server/services/bklOrg');
 
 const router = express.Router();
 
@@ -316,6 +322,44 @@ router.post('/users/sync-groups', async (req, res) => {
     const remaining = await users.countDocuments(orgSyncFilter());
 
     res.json({ synced, empty, failed, remaining, processed: targets.length, errors });
+  } catch (err) {
+    res.status(500).json({ error: String(err.message) });
+  }
+});
+
+/**
+ * 단건 그룹 동기화 — 사용자 상세 패널의 [그룹 동기화] 버튼.
+ *
+ * BIMS 응답 원문(`User/group/{sid}`)을 함께 돌려준다. 일괄 동기화는 결과를
+ * 숫자로만 요약해서 "이 사람은 왜 그룹이 안 잡히나" 를 볼 수 없다. 재조회
+ * 주기와 무관하게 즉시 부르고, BIMS 쪽 실패(307·401·타임아웃)도 200 으로
+ * 원인을 담아 돌려준다 — 화면이 그 원인을 그대로 보여줘야 하기 때문이다.
+ */
+router.post('/users/:userId/sync-group', async (req, res) => {
+  try {
+    if (!isOrgApiEnabled()) {
+      return res.status(400).json({
+        error: '조직 API 미연동 (BIMS_ORG_BASE 미설정). 운영은 https://nb.bkl.co.kr/apis/mentat 입니다.',
+      });
+    }
+
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: '잘못된 사용자 ID 입니다.' });
+    }
+
+    const user = await getDb()
+      .collection('users')
+      .findOne({ _id: new mongoose.Types.ObjectId(userId) }, { projection: { bkl_sid: 1 } });
+    if (!user) {
+      return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+    }
+    if (typeof user.bkl_sid !== 'number') {
+      return res.status(400).json({ error: 'BIMS sid 가 없는 사용자입니다 (BIMS 연동 전).' });
+    }
+
+    const result = await inspectAndSyncUserOrg(user._id, user.bkl_sid);
+    res.json({ sid: user.bkl_sid, ...result });
   } catch (err) {
     res.status(500).json({ error: String(err.message) });
   }

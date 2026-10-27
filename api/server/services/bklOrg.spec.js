@@ -8,6 +8,7 @@ const {
   needsOrgSync,
   orgSyncFilter,
   syncUserOrg,
+  inspectAndSyncUserOrg,
   refreshUserOrgInBackground,
 } = require('./bklOrg');
 
@@ -25,6 +26,7 @@ const ORG_ROW = {
 };
 
 const okResponse = (body) => ({ ok: true, status: 200, json: async () => body });
+const sentHeaders = () => global.fetch.mock.calls[0][1].headers;
 
 describe('bklOrg', () => {
   const originalEnv = { ...process.env };
@@ -285,6 +287,154 @@ describe('bklOrg', () => {
       await flush();
 
       expect(persistBklFields).not.toHaveBeenCalled();
+    });
+
+    /** 로그인 중 BIMS 가 방금 발급한 본인 토큰을 그 자리에서 쓴다. */
+    test('로그인 토큰을 조회에 쓴다', async () => {
+      process.env.BIMS_ORG_BASE = TEST_BASE;
+      global.fetch.mockResolvedValue(okResponse([ORG_ROW]));
+
+      refreshUserOrgInBackground({ _id: 'u1', bkl_sid: 100078 }, { accessToken: 'tok-login' });
+      await flush();
+
+      expect(sentHeaders().Authorization).toBe('Bearer tok-login');
+    });
+  });
+
+  describe('사용자 토큰', () => {
+    beforeEach(() => {
+      process.env.BIMS_ORG_BASE = TEST_BASE;
+      global.fetch.mockResolvedValue(okResponse([ORG_ROW]));
+    });
+
+    test('accessToken 을 주면 Bearer 로 보낸다', async () => {
+      await fetchUserOrg(1, { accessToken: 'tok-123' });
+
+      expect(sentHeaders().Authorization).toBe('Bearer tok-123');
+    });
+
+    /** 정적 헤더도 Authorization 이면 방금 발급된 본인 토큰이 더 구체적이다. */
+    test('정적 Authorization 헤더보다 사용자 토큰이 우선한다', async () => {
+      process.env.BIMS_ORG_AUTH_HEADER = 'Authorization';
+      process.env.BIMS_ORG_AUTH_VALUE = 'Bearer static';
+
+      await fetchUserOrg(1, { accessToken: 'tok-123' });
+
+      expect(sentHeaders().Authorization).toBe('Bearer tok-123');
+    });
+
+    test('이름이 다른 정적 헤더는 함께 보낸다', async () => {
+      process.env.BIMS_ORG_AUTH_HEADER = 'X-Api-Key';
+      process.env.BIMS_ORG_AUTH_VALUE = 'k';
+
+      await fetchUserOrg(1, { accessToken: 'tok-123' });
+
+      expect(sentHeaders()).toMatchObject({ 'X-Api-Key': 'k', Authorization: 'Bearer tok-123' });
+    });
+
+    test('토큰이 없으면 Authorization 을 붙이지 않는다', async () => {
+      await fetchUserOrg(1);
+
+      expect(sentHeaders().Authorization).toBeUndefined();
+    });
+  });
+
+  /**
+   * 어드민 단건 동기화 — 원문과 저장 결과를 돌려주고, 실패해도 던지지 않는다.
+   * "이 사람은 왜 그룹이 안 잡히나" 를 화면에서 원문으로 봐야 하기 때문이다.
+   */
+  describe('inspectAndSyncUserOrg', () => {
+    beforeEach(() => {
+      process.env.BIMS_ORG_BASE = TEST_BASE;
+    });
+
+    test('성공하면 BIMS 원문과 저장 필드를 함께 돌려준다', async () => {
+      global.fetch.mockResolvedValue(okResponse([ORG_ROW]));
+
+      const result = await inspectAndSyncUserOrg('u1', 100078);
+
+      expect(result).toMatchObject({
+        url: `${TEST_BASE}/User/group/100078`,
+        ok: true,
+        status: 200,
+        auth: 'none',
+        body: [ORG_ROW],
+        saved: { bkl_group_sid: 331, bkl_group_name: '규제그룹(04)' },
+        error: null,
+      });
+      expect(persistBklFields).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ bkl_group_sid: 331, bkl_org_synced_at: expect.any(Date) }),
+      );
+    });
+
+    test('그룹이 없으면 저장 필드 없이 타임스탬프만 남긴다', async () => {
+      global.fetch.mockResolvedValue(okResponse([]));
+
+      const result = await inspectAndSyncUserOrg('u1', 1);
+
+      expect(result).toMatchObject({ saved: null, error: null, body: [] });
+      expect(persistBklFields).toHaveBeenCalledWith('u1', { bkl_org_synced_at: expect.any(Date) });
+    });
+
+    test('리다이렉트는 상태와 Location 을 담아 돌려주고 저장하지 않는다', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        status: 307,
+        headers: { get: (name) => (name === 'location' ? 'https://nb.bkl.co.kr/login-azure' : null) },
+        json: async () => ({}),
+      });
+
+      const result = await inspectAndSyncUserOrg('u1', 1);
+
+      expect(result).toMatchObject({
+        status: 307,
+        location: 'https://nb.bkl.co.kr/login-azure',
+        body: null,
+        saved: null,
+      });
+      expect(result.error).toMatch(/리다이렉트/);
+      expect(persistBklFields).not.toHaveBeenCalled();
+    });
+
+    test('4xx 는 응답 본문까지 돌려준다', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ message: 'unauthorized' }),
+      });
+
+      const result = await inspectAndSyncUserOrg('u1', 1);
+
+      expect(result).toMatchObject({ status: 401, body: { message: 'unauthorized' }, saved: null });
+      expect(result.error).toMatch('HTTP 401');
+      expect(persistBklFields).not.toHaveBeenCalled();
+    });
+
+    test('네트워크 오류도 던지지 않고 원인을 돌려준다', async () => {
+      global.fetch.mockRejectedValue(new Error('network down'));
+
+      const result = await inspectAndSyncUserOrg('u1', 1);
+
+      expect(result).toMatchObject({
+        url: `${TEST_BASE}/User/group/1`,
+        status: null,
+        saved: null,
+        error: 'network down',
+      });
+      expect(persistBklFields).not.toHaveBeenCalled();
+    });
+
+    /** 진단 화면에 어떤 인증을 썼는지는 보이되, 비밀값은 절대 실리면 안 된다. */
+    test('정적 헤더를 썼다는 사실만 남기고 값은 담지 않는다', async () => {
+      process.env.BIMS_ORG_AUTH_HEADER = 'Authorization';
+      process.env.BIMS_ORG_AUTH_VALUE = 'Bearer s3cret-static';
+      global.fetch.mockResolvedValue(okResponse([ORG_ROW]));
+
+      const result = await inspectAndSyncUserOrg('u1', 1);
+
+      expect(result.auth).toBe('static_header');
+      expect(JSON.stringify(result)).not.toContain('s3cret-static');
     });
   });
 });

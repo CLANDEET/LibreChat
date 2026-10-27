@@ -19,8 +19,12 @@
  *
  * 환경변수:
  *   BIMS_ORG_BASE         조직 API base (운영: https://nb.bkl.co.kr/apis/mentat)
- *   BIMS_ORG_AUTH_HEADER  인증 헤더 이름 (운영이 인증을 요구할 경우)
- *   BIMS_ORG_AUTH_VALUE   인증 헤더 값
+ *   BIMS_ORG_AUTH_HEADER  정적 인증 헤더 이름 (토큰이 없는 경로용 — 어드민 동기화)
+ *   BIMS_ORG_AUTH_VALUE   정적 인증 헤더 값
+ *
+ * 인증: 로그인 경로는 BIMS 가 방금 발급한 그 사용자의 accessToken 을
+ * `Authorization: Bearer` 로 쓴다 (저장하지 않는다). 토큰이 없는 경로는 위
+ * 정적 헤더가 있으면 그것을, 없으면 무인증으로 부른다.
  *   BIMS_ORG_TIMEOUT_MS   요청 타임아웃 (기본 8000)
  *   BIMS_ORG_STALE_DAYS   재조회 주기 (기본 30일)
  */
@@ -47,10 +51,26 @@ function staleMs() {
   return (Number.isFinite(days) && days > 0 ? days : DEFAULT_STALE_DAYS) * 24 * 3600 * 1000;
 }
 
-function authHeaders() {
+/**
+ * 정적 헤더(환경변수) 위에 사용자 토큰을 얹는다. 정적 헤더도 Authorization 이면
+ * 사용자 토큰이 이긴다 — 방금 발급된 본인 토큰이 더 구체적이다.
+ */
+function authHeaders(accessToken) {
   const name = (process.env.BIMS_ORG_AUTH_HEADER || '').trim();
   const value = process.env.BIMS_ORG_AUTH_VALUE || '';
-  return name && value ? { [name]: value } : {};
+  return {
+    ...(name && value ? { [name]: value } : {}),
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+  };
+}
+
+/** 어떤 인증으로 불렀는지 — 진단 표시용. 토큰 값은 절대 담지 않는다. */
+function authMode(accessToken) {
+  if (accessToken) {
+    return 'user_token';
+  }
+  const hasStatic = (process.env.BIMS_ORG_AUTH_HEADER || '').trim() && process.env.BIMS_ORG_AUTH_VALUE;
+  return hasStatic ? 'static_header' : 'none';
 }
 
 const numOrNull = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
@@ -88,40 +108,80 @@ function parseOrgResponse(payload) {
   };
 }
 
-/**
- * `GET {base}/User/group/{sid}` 로 한 사용자의 조직 정보를 읽는다.
- *
- * 리다이렉트를 따라가지 않는다. 운영에서 3xx 가 오면 대개 base URL 이 틀린
- * 것이다 — API 경로가 아니면 BIMS 웹앱(Auth.js)이 요청을 가로채 Azure 로그인
- * (`/login-azure`) 으로 307 을 낸다. 따라가면 HTML 을 JSON 으로 파싱하려다
- * 엉뚱한 오류가 나므로, 3xx 를 그대로 설정 오류 신호로 보고한다.
- *
- * @param {number|string} sid BIMS 사용자 sid
- * @returns {Promise<Record<string, unknown>|null>} 저장할 필드 또는 null
- */
-async function fetchUserOrg(sid) {
+function orgUrl(sid) {
   const base = orgBase();
   if (!base) {
     throw new Error('조직 API 미연동 (BIMS_ORG_BASE 미설정)');
   }
+  return `${base}/User/group/${encodeURIComponent(sid)}`;
+}
 
-  const res = await fetch(`${base}/User/group/${encodeURIComponent(sid)}`, {
-    headers: { Accept: 'application/json', ...authHeaders() },
+/**
+ * `GET {base}/User/group/{sid}` 를 부르고 응답을 **판정 전 그대로** 돌려준다.
+ * 어드민 단건 동기화가 BIMS 원문을 보여주는 데 쓰고, `fetchUserOrg` 는 이 위에서
+ * 판정·파싱만 한다.
+ *
+ * 리다이렉트를 따라가지 않는다. 운영에서 3xx 가 오면 대개 base URL 이 틀린
+ * 것이다 — API 경로가 아니면 BIMS 웹앱(Auth.js)이 요청을 가로채 Azure 로그인
+ * (`/login-azure`) 으로 307 을 낸다. 따라가면 HTML 을 JSON 으로 파싱하려다
+ * 엉뚱한 오류가 나므로 3xx 는 본문을 읽지 않는다.
+ *
+ * 2xx 본문 파싱 실패는 그대로 던진다. 삼키면 "그룹 없음" 으로 오인돼
+ * 동기화 시각이 찍히고 재조회 주기 동안 다시 시도하지 않게 된다.
+ *
+ * @param {number|string} sid BIMS 사용자 sid
+ * @param {{ accessToken?: string }} [options] accessToken: 그 사용자의 BIMS 토큰
+ */
+async function requestUserOrg(sid, { accessToken } = {}) {
+  const url = orgUrl(sid);
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json', ...authHeaders(accessToken) },
     redirect: 'manual',
     signal: AbortSignal.timeout(timeoutMs()),
   });
 
-  if (res.status >= 300 && res.status < 400) {
+  const redirected = res.status >= 300 && res.status < 400;
+  let body = null;
+  if (res.ok) {
+    body = await res.json();
+  } else if (!redirected) {
+    body = await res.json().catch(() => null);
+  }
+
+  return {
+    url,
+    ok: res.ok,
+    status: res.status,
+    location: res.headers?.get?.('location') ?? null,
+    auth: authMode(accessToken),
+    body,
+  };
+}
+
+/** 조직 정보로 쓸 수 없는 응답이면 원인을 담아 던진다. */
+function assertOrgResponse({ ok, status }) {
+  if (status >= 300 && status < 400) {
     throw new Error(
-      `조직 API 가 리다이렉트를 반환했습니다 (HTTP ${res.status}) — ` +
+      `조직 API 가 리다이렉트를 반환했습니다 (HTTP ${status}) — ` +
         `BIMS_ORG_BASE 경로를 확인하세요 (운영: https://nb.bkl.co.kr/apis/mentat)`,
     );
   }
-  if (!res.ok) {
-    throw new Error(`조직 API 응답 오류: HTTP ${res.status}`);
+  if (!ok) {
+    throw new Error(`조직 API 응답 오류: HTTP ${status}`);
   }
+}
 
-  return parseOrgResponse(await res.json());
+/**
+ * 한 사용자의 조직 정보를 읽어 저장할 필드로 돌려준다.
+ *
+ * @param {number|string} sid BIMS 사용자 sid
+ * @param {{ accessToken?: string }} [options]
+ * @returns {Promise<Record<string, unknown>|null>} 저장할 필드 또는 null
+ */
+async function fetchUserOrg(sid, options) {
+  const response = await requestUserOrg(sid, options);
+  assertOrgResponse(response);
+  return parseOrgResponse(response.body);
 }
 
 /**
@@ -164,26 +224,73 @@ function orgSyncFilter() {
  *
  * @returns {Promise<boolean>} 그룹 정보를 저장했으면 true
  */
-async function syncUserOrg(userId, sid) {
-  const fields = await fetchUserOrg(sid);
-  await persistBklFields(userId, { ...(fields || {}), bkl_org_synced_at: new Date() });
+async function syncUserOrg(userId, sid, options) {
+  const fields = await fetchUserOrg(sid, options);
+  await saveUserOrg(userId, fields);
   return fields != null;
 }
 
+function saveUserOrg(userId, fields) {
+  return persistBklFields(userId, { ...(fields || {}), bkl_org_synced_at: new Date() });
+}
+
 /**
- * 로그인 경로에서 쓰는 비차단 갱신.
+ * 어드민 단건 동기화 — BIMS 원문과 저장 결과를 함께 돌려준다.
+ *
+ * `syncUserOrg` 와 달리 실패해도 던지지 않고 원인을 담아 돌려준다. 이 경로의
+ * 목적이 "이 사람은 왜 그룹이 안 잡히나" 를 원문으로 보는 것이라, 307 / 401 /
+ * 타임아웃도 화면에 그대로 보여야 한다. 저장 규칙은 `syncUserOrg` 와 같고,
+ * 재조회 주기와 무관하게 즉시 부른다.
+ *
+ * @returns {Promise<{url: string, ok: boolean, status: number|null, location: string|null,
+ *   auth: string, body: unknown, saved: Record<string, unknown>|null, error: string|null}>}
+ */
+async function inspectAndSyncUserOrg(userId, sid) {
+  let response;
+  try {
+    response = await requestUserOrg(sid);
+  } catch (err) {
+    return {
+      url: orgUrl(sid),
+      ok: false,
+      status: null,
+      location: null,
+      auth: authMode(),
+      body: null,
+      saved: null,
+      error: err.message,
+    };
+  }
+
+  try {
+    assertOrgResponse(response);
+  } catch (err) {
+    return { ...response, saved: null, error: err.message };
+  }
+
+  const fields = parseOrgResponse(response.body);
+  await saveUserOrg(userId, fields);
+  return { ...response, saved: fields, error: null };
+}
+
+/**
+ * 로그인 경로에서 쓰는 비차단 갱신 — 비밀번호 로그인과 OIDC 로그인 모두.
  *
  * 로그인 응답을 지연시키지 않는 것이 핵심이다. 실패는 로그만 남기고 삼킨다 —
  * 조직 정보가 없다고 로그인을 막을 이유가 없다.
  *
+ * `accessToken` 은 로그인 중 BIMS 가 방금 발급한 그 사용자의 토큰이다. 그 자리
+ * 에서 한 번 쓰고 버린다 — 저장하지 않으니 만료(30일)를 관리할 필요도 없다.
+ *
  * @param {Record<string, unknown>|null} user
+ * @param {{ accessToken?: string }} [options]
  */
-function refreshUserOrgInBackground(user) {
+function refreshUserOrgInBackground(user, options) {
   if (!isOrgApiEnabled() || !needsOrgSync(user)) {
     return;
   }
   setImmediate(() => {
-    syncUserOrg(user._id, user.bkl_sid).catch((err) => {
+    syncUserOrg(user._id, user.bkl_sid, options).catch((err) => {
       logger.warn(`[BKL Org] 조직 정보 갱신 실패 (sid=${user.bkl_sid}): ${err.message}`);
     });
   });
@@ -196,5 +303,6 @@ module.exports = {
   needsOrgSync,
   orgSyncFilter,
   syncUserOrg,
+  inspectAndSyncUserOrg,
   refreshUserOrgInBackground,
 };

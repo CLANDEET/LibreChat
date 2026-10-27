@@ -170,8 +170,8 @@ async function passportLogin(req, email_or_id, password, done) {
       `[BKL Login] [Login successful] [ID: ${id}] [Sid: ${bklSid}] [Request-IP: ${req.ip}]`,
     );
     // 조직(그룹) 정보 갱신 — 로그인 응답을 지연시키지 않도록 비차단으로 돌린다.
-    // 전 직원이 주기적으로 로그인하므로 어드민 일괄 동기화 없이도 채워진다.
-    refreshUserOrgInBackground(user);
+    // 방금 BIMS 가 발급한 본인 토큰으로 부르고 버린다 (저장·만료 관리 불필요).
+    refreshUserOrgInBackground(user, { accessToken: data.accessToken });
     return done(null, user);
   } catch (err) {
     logger.error('[BKL Login] Exception during login', err);
