@@ -134,28 +134,55 @@ function orgUrl(sid) {
  */
 async function requestUserOrg(sid, { accessToken } = {}) {
   const url = orgUrl(sid);
+  const auth = authMode(accessToken);
   const res = await fetch(url, {
     headers: { Accept: 'application/json', ...authHeaders(accessToken) },
     redirect: 'manual',
     signal: AbortSignal.timeout(timeoutMs()),
+  }).catch((err) => {
+    logger.warn(`[BKL Org] GET ${url} → 요청 실패 [auth: ${auth}] ${err.message}`);
+    throw err;
   });
 
   const redirected = res.status >= 300 && res.status < 400;
   let body = null;
   if (res.ok) {
-    body = await res.json();
+    body = await res.json().catch((err) => {
+      logger.warn(`[BKL Org] GET ${url} → HTTP ${res.status} [auth: ${auth}] JSON 아님: ${err.message}`);
+      throw err;
+    });
   } else if (!redirected) {
     body = await res.json().catch(() => null);
   }
 
-  return {
+  const response = {
     url,
     ok: res.ok,
     status: res.status,
     location: res.headers?.get?.('location') ?? null,
-    auth: authMode(accessToken),
+    auth,
     body,
   };
+  logOrgResponse(response);
+  return response;
+}
+
+/**
+ * 조직 API 응답을 **원문 그대로, 자르지 않고** 남긴다.
+ *
+ * `parseOrgResponse` 가 키를 골라 읽기 때문에 운영 응답의 키 이름이 다르면 200
+ * 이어도 "그룹 없음" 으로 판정되고, 타임스탬프가 찍혀 재조회 주기 동안 다시 부르지
+ * 않는다. 원문이 없으면 그 상황을 볼 길이 없다. 로그인·어드민 일괄·단건 세 경로가
+ * 모두 여기를 지난다. 인증은 방식만 남기고 값은 남기지 않는다.
+ */
+function logOrgResponse({ url, ok, status, location, auth, body }) {
+  const detail = location ? `→ ${location}` : JSON.stringify(body);
+  const line = `[BKL Org] GET ${url} → HTTP ${status} [auth: ${auth}] ${detail}`;
+  if (ok) {
+    logger.info(line);
+    return;
+  }
+  logger.warn(line);
 }
 
 /** 조직 정보로 쓸 수 없는 응답이면 원인을 담아 던진다. */

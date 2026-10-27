@@ -1,5 +1,6 @@
 jest.mock('~/server/services/bklSso', () => ({ persistBklFields: jest.fn() }));
 
+const { logger } = require('@librechat/data-schemas');
 const { persistBklFields } = require('~/server/services/bklSso');
 const {
   isOrgApiEnabled,
@@ -435,6 +436,87 @@ describe('bklOrg', () => {
 
       expect(result.auth).toBe('static_header');
       expect(JSON.stringify(result)).not.toContain('s3cret-static');
+    });
+  });
+
+  /**
+   * 조직 API 응답은 원문 그대로, 자르지 않고 남는다. parseOrgResponse 가 키를 골라
+   * 읽어서, 키 이름이 다르면 200 인데도 "그룹 없음" 으로 조용히 넘어가기 때문이다.
+   */
+  describe('응답 로그', () => {
+    let spies;
+    const logged = () =>
+      [...spies.info.mock.calls, ...spies.warn.mock.calls].map(([line]) => line).join('\n');
+
+    beforeEach(() => {
+      process.env.BIMS_ORG_BASE = TEST_BASE;
+      spies = {
+        info: jest.spyOn(logger, 'info').mockImplementation(() => {}),
+        warn: jest.spyOn(logger, 'warn').mockImplementation(() => {}),
+      };
+    });
+
+    afterEach(() => {
+      spies.info.mockRestore();
+      spies.warn.mockRestore();
+    });
+
+    test('응답 원문을 자르지 않고 남긴다', async () => {
+      const longRow = { ...ORG_ROW, groupName: '가'.repeat(500) };
+      global.fetch.mockResolvedValue(okResponse([longRow]));
+
+      await fetchUserOrg(100078);
+
+      expect(spies.info).toHaveBeenCalledTimes(1);
+      expect(logged()).toContain(`${TEST_BASE}/User/group/100078 → HTTP 200`);
+      expect(logged()).toContain(JSON.stringify([longRow]));
+    });
+
+    test('키 이름이 달라 그룹을 못 읽어도 원문은 남는다', async () => {
+      const unexpected = [{ GROUP_SID: 330, GROUP_NM: '기업법무그룹(03)' }];
+      global.fetch.mockResolvedValue(okResponse(unexpected));
+
+      await expect(fetchUserOrg(1)).resolves.toBeNull();
+      expect(logged()).toContain(JSON.stringify(unexpected));
+    });
+
+    test('토큰 값은 남기지 않고 인증 방식만 남긴다', async () => {
+      global.fetch.mockResolvedValue(okResponse([ORG_ROW]));
+
+      await fetchUserOrg(1, { accessToken: 'tok-secret' });
+
+      expect(logged()).toContain('[auth: user_token]');
+      expect(logged()).not.toContain('tok-secret');
+    });
+
+    test('비정상 응답은 warn 으로 본문까지 남긴다', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ message: 'unauthorized' }),
+      });
+
+      await expect(fetchUserOrg(1)).rejects.toThrow('HTTP 401');
+      expect(spies.warn.mock.calls[0][0]).toContain('HTTP 401 [auth: none] {"message":"unauthorized"}');
+    });
+
+    test('리다이렉트는 Location 을 남긴다', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        status: 307,
+        headers: { get: (name) => (name === 'location' ? 'https://nb.bkl.co.kr/login-azure' : null) },
+        json: async () => ({}),
+      });
+
+      await expect(fetchUserOrg(1)).rejects.toThrow(/리다이렉트/);
+      expect(spies.warn.mock.calls[0][0]).toContain('HTTP 307 [auth: none] → https://nb.bkl.co.kr/login-azure');
+    });
+
+    test('요청 자체가 실패해도 남긴다', async () => {
+      global.fetch.mockRejectedValue(new Error('network down'));
+
+      await expect(fetchUserOrg(1)).rejects.toThrow('network down');
+      expect(spies.warn.mock.calls[0][0]).toContain('요청 실패 [auth: none] network down');
     });
   });
 });
