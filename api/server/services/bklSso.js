@@ -177,7 +177,11 @@ function toBklFields(data, loginId) {
  *
  * @param {Record<string, unknown>} tokenset  openid-client tokenset
  * @param {Record<string, unknown>} user      processOpenIDAuth 결과
- * @returns {Promise<{ok: boolean, sid?: number|null, message?: string}>}
+ * 성공 시 `accessToken` 도 돌려준다 — BIMS 가 방금 발급한 그 사용자의 토큰으로,
+ * 호출자가 조직 조회에 한 번 쓰고 버린다. user 문서에는 저장하지 않는다. 기존
+ * sid 로 진행하는 폴백 경로에는 토큰이 없다.
+ *
+ * @returns {Promise<{ok: boolean, sid?: number|null, accessToken?: string, message?: string}>}
  */
 const LOG_VALUE_MAX = 48;
 
@@ -261,7 +265,7 @@ async function linkBimsIdentity(tokenset, user) {
         `[BKL SSO] BIMS 연결 성공 [id: ${id}] [sid: ${fields.bkl_sid}] ` +
           `[userNm: ${fields.bkl_user_nm}]${attempts.length ? ` (시도: ${attempts.length + 1})` : ''}`,
       );
-      return { ok: true, sid: fields.bkl_sid };
+      return { ok: true, sid: fields.bkl_sid, accessToken: result.data.accessToken };
     }
     attempts.push(`${id}=${result.reason}`);
   }

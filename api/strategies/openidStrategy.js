@@ -21,6 +21,7 @@ const { findUser, createUser, updateUser } = require('~/models');
 const { getAppConfig } = require('~/server/services/Config');
 const getLogStores = require('~/cache/getLogStores');
 const { linkBimsIdentity } = require('~/server/services/bklSso');
+const { refreshUserOrgInBackground } = require('~/server/services/bklOrg');
 
 /**
  * @typedef {import('openid-client').ClientMetadata} ClientMetadata
@@ -643,6 +644,11 @@ function createOpenIDCallback(existingUsersOnly) {
       if (!bimsLink.ok) {
         return done(null, false, { message: bimsLink.message });
       }
+
+      /* BKL: 조직(그룹) 정보 — 비밀번호 로그인과 같은 비차단 갱신. 그동안 이
+       * 경로에 빠져 있어 Azure 로그인 사용자는 어드민 일괄 동기화로만 채워졌다.
+       * BIMS 가 방금 발급한 본인 토큰으로 부르고 버린다. */
+      refreshUserOrgInBackground(user, { accessToken: bimsLink.accessToken });
 
       done(null, user);
     } catch (err) {

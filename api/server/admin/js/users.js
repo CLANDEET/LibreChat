@@ -21,6 +21,7 @@
     sortDir: 'desc',
     searchText: '',
     group: 'all',
+    orgSyncing: false,
   };
 
   /* ── 사용자 목록 ──────────────────────────────────────────── */
@@ -131,6 +132,8 @@
       (user?.email || '') + (user?.last_active ? ' · 최근 활동 ' + A.fmtKST(user.last_active) : '');
     document.getElementById('session-user-models').innerHTML =
       (user?.by_model || []).map((m) => `<span class="badge">${A.escHtml(m.model)} ${A.fmtNum(m.queries)}</span>`).join('');
+    if (!preserve) closeOrgSyncResult();
+    updateUserSyncButton();
 
     const listEl = document.getElementById('session-list');
     listEl.innerHTML = '<div class="msg-loading" style="padding:16px 18px;">세션 로딩 중...</div>';
@@ -276,6 +279,90 @@
     }
   }
 
+  /* ── 단건 그룹 동기화 (사용자 상세 패널) ─────────────────── */
+  const AUTH_LABELS = { user_token: '사용자 토큰', static_header: '환경변수 헤더', none: '없음' };
+
+  function updateUserSyncButton() {
+    const btn = document.getElementById('btn-sync-user-group');
+    const user = ui.users.find((u) => u.user_id === ui.selectedUserId);
+    btn.disabled = ui.orgSyncing || !user?.bkl_sid;
+    btn.textContent = ui.orgSyncing ? '동기화 중...' : '그룹 동기화';
+    btn.title = user?.bkl_sid
+      ? 'BIMS 조직 API 로 이 사용자의 그룹을 다시 조회해 저장합니다 (sid ' + user.bkl_sid + ')'
+      : 'BIMS sid 가 없는 사용자입니다 (BIMS 연동 전)';
+  }
+
+  function closeOrgSyncResult() {
+    const box = document.getElementById('org-sync-result');
+    box.hidden = true;
+    box.innerHTML = '';
+  }
+
+  /** 요청 · 판정 · 저장 결과와 BIMS 응답 원문을 그대로 보여준다. */
+  function renderOrgSyncResult(r) {
+    const status = r.status == null
+      ? '응답 없음'
+      : 'HTTP ' + r.status + (r.location ? ' → ' + r.location : '');
+    let outcome;
+    if (r.error) {
+      outcome = '<span class="err-text">실패 — 저장하지 않음: ' + A.escHtml(r.error) + '</span>';
+    } else if (r.saved) {
+      const org = [r.saved.bkl_hq_name, r.saved.bkl_div_name, r.saved.bkl_group_name].filter(Boolean);
+      outcome = '저장됨: ' + A.escHtml(org.join(' › ') || '(이름 없음)');
+    } else {
+      outcome = '그룹 없음 — 동기화 시각만 갱신';
+    }
+    const raw = r.body == null ? '(본문 없음)' : JSON.stringify(r.body, null, 2);
+    return `
+      <div class="org-sync-head">
+        <span class="org-sync-title">BIMS 조직 조회 · sid ${A.escHtml(String(r.sid))}</span>
+        <button type="button" class="org-sync-close" aria-label="결과 닫기">×</button>
+      </div>
+      <div class="org-sync-line">GET ${A.escHtml(r.url || '')}</div>
+      <div class="org-sync-line">${A.escHtml(status)} · 인증 ${A.escHtml(AUTH_LABELS[r.auth] || r.auth || '-')}</div>
+      <div class="org-sync-line">${outcome}</div>
+      <pre class="org-sync-raw">${A.escHtml(raw)}</pre>`;
+  }
+
+  /**
+   * 선택한 사용자의 그룹을 BIMS 에서 다시 받아 저장하고 응답 원문을 펼친다.
+   * 일괄 동기화와 달리 재조회 주기를 무시하고 즉시 부르며, 실패 원인
+   * (307 · 401 · 타임아웃)도 원문 그대로 보여준다.
+   */
+  async function syncSelectedUserGroup() {
+    const userId = ui.selectedUserId;
+    const user = ui.users.find((u) => u.user_id === userId);
+    if (!user?.bkl_sid || ui.orgSyncing) return;
+
+    const box = document.getElementById('org-sync-result');
+    ui.orgSyncing = true;
+    updateUserSyncButton();
+    box.hidden = false;
+    box.innerHTML = '<div class="msg-loading">BIMS 조회 중...</div>';
+    try {
+      const r = await A.sendJSON('POST', '/users/' + encodeURIComponent(userId) + '/sync-group', {});
+      if (r.saved) {
+        Object.assign(user, {
+          group_sid: r.saved.bkl_group_sid ?? null,
+          group_name: r.saved.bkl_group_name ?? null,
+          div_name: r.saved.bkl_div_name ?? null,
+          hq_name: r.saved.bkl_hq_name ?? null,
+        });
+        renderGroupFilter();
+        renderUsersTable();
+      }
+      // 기다리는 사이 다른 사용자를 골랐다면 그 사람 패널에 덮어쓰지 않는다.
+      if (ui.selectedUserId === userId) box.innerHTML = renderOrgSyncResult(r);
+    } catch (e) {
+      if (ui.selectedUserId === userId) {
+        box.innerHTML = '<div class="err-text">그룹 동기화 실패: ' + A.escHtml(e.message) + '</div>';
+      }
+    } finally {
+      ui.orgSyncing = false;
+      updateUserSyncButton();
+    }
+  }
+
   /* ── 엑셀 ─────────────────────────────────────────────────── */
   function exportUsers() {
     const list = filteredUsers();
@@ -346,6 +433,10 @@
   });
   document.getElementById('btn-export-users').addEventListener('click', exportUsers);
   document.getElementById('btn-export-sessions').addEventListener('click', exportSessions);
+  document.getElementById('btn-sync-user-group').addEventListener('click', syncSelectedUserGroup);
+  document.getElementById('org-sync-result').addEventListener('click', (e) => {
+    if (e.target.closest('.org-sync-close')) closeOrgSyncResult();
+  });
 
   A.registerTab('users', { load });
 })();
