@@ -15,8 +15,9 @@ import { cn } from '~/utils';
  * - 본문이 시작되면 자동으로 접힘(사용자가 직접 토글했으면 그대로 둠).
  * - 끝난 뒤: "진행 내역" 으로 접혀 있고 눌러서 다시 볼 수 있다.
  *
- * 디자인: 무색 배경에 얇은 테두리 상자 하나. 본문보다 한 단계 작은 글자(text-sm)와
- * 흐린 색(text-secondary)으로 본문과 구별. 아이콘은 진행 중 점 세 개 깜빡임 하나뿐.
+ * 디자인: 무색 배경에 얇은 테두리 상자 하나, 줄마다 문장 하나(라벨 열 없음).
+ * 본문보다 한 단계 작은 글자(text-sm)와 흐린 색으로 본문과 구별.
+ * 아이콘은 진행 중 점 세 개 깜빡임 하나뿐.
  *
  * 판별은 백엔드 `src/api/utils/stage_progress.py` 가 쓰는 라벨 집합으로 한다.
  * 일반 reasoning 모델의 사고 과정은 여기 걸리지 않고 기존 Reasoning 으로 간다.
@@ -171,19 +172,16 @@ const BklStageProgress = memo(({ stages, isStreaming, isLast }: Props) => {
               return (
                 <li
                   key={`${i}-${s.label}`}
-                  className="flex items-baseline gap-2.5 py-1 leading-[20px]"
+                  className={cn(
+                    'truncate py-1 leading-[20px]',
+                    isCurrent ? 'text-text-secondary' : 'text-text-tertiary',
+                  )}
                   data-testid="bkl-stage-row"
                   data-state={isCurrent ? 'running' : 'done'}
+                  title={s.detail || s.label}
                 >
-                  <span
-                    className={cn(
-                      'w-[6.5em] flex-shrink-0',
-                      isCurrent ? 'text-text-secondary' : 'text-text-tertiary',
-                    )}
-                  >
-                    {s.label}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-text-secondary">{s.detail}</span>
+                  {/* 라벨은 헤더/판별용. 줄에는 혼자 읽히는 문장만 보여준다 */}
+                  {s.detail || s.label}
                 </li>
               );
             })}
