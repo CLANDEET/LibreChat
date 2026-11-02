@@ -49,12 +49,12 @@ describe('BklStageProgress', () => {
     expect(rows[2]).toHaveAttribute('data-state', 'running');
   });
 
-  it('after the answer starts (not last part): header becomes 검색 과정 and collapses', () => {
+  it('after the answer starts (not last part): header becomes 진행 내역 and collapses', () => {
     const { rerender } = render(
       <BklStageProgress stages={stages} isStreaming={true} isLast={true} />,
     );
     rerender(<BklStageProgress stages={stages} isStreaming={true} isLast={false} />);
-    const btn = screen.getByRole('button', { name: /^검색 과정$/ });
+    const btn = screen.getByRole('button', { name: /^진행 내역$/ });
     expect(btn).toHaveAttribute('aria-expanded', 'false');
     const rows = screen.getAllByTestId('bkl-stage-row');
     expect(rows.every((r) => r.getAttribute('data-state') === 'done')).toBe(true);
@@ -62,7 +62,7 @@ describe('BklStageProgress', () => {
 
   it('finished message: collapsed by default, toggles on click', () => {
     render(<BklStageProgress stages={stages} isStreaming={false} isLast={false} />);
-    const btn = screen.getByRole('button', { name: /^검색 과정$/ });
+    const btn = screen.getByRole('button', { name: /^진행 내역$/ });
     expect(btn).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(btn);
     expect(btn).toHaveAttribute('aria-expanded', 'true');
