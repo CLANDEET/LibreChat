@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useId } from 'react';
 import { useAtomValue } from 'jotai';
-import { Check, ChevronDown, Loader2, Search } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import { showThinkingAtom } from '~/store/showThinking';
 import { fontSizeAtom } from '~/store/fontSize';
@@ -10,11 +10,14 @@ import { cn } from '~/utils';
  * BKL 진행 단계 표시 (2026-11-02).
  *
  * bkl-api 가 답변 첫 토큰 전에 `delta.reasoning_content` 로 흘려보내는
- * "라벨 — 상세" 한 줄짜리 진행 단계를 "생각" 블록 대신 체크리스트로 그린다.
+ * "라벨 — 상세" 한 줄짜리 진행 단계를 "생각" 블록 대신 단계 목록으로 그린다.
  *
- * - 스트리밍 중(본문 전): 기본 펼침, 마지막 줄에 스피너, 헤더에 현재 단계명.
+ * - 스트리밍 중(본문 전): 기본 펼침, 헤더에 현재 단계명과 진행 표시.
  * - 본문이 시작되면 자동으로 접힘(사용자가 직접 토글했으면 그대로 둠).
- * - 끝난 뒤: "검색 과정 (N단계)" 로 접혀 있고 눌러서 다시 볼 수 있다.
+ * - 끝난 뒤: "검색 과정" 으로 접혀 있고 눌러서 다시 볼 수 있다.
+ *
+ * 디자인: 채워진 박스 없이 무색 배경. 줄마다 얇은 구분선, 왼쪽에 흐린 라벨,
+ * 오른쪽에 내용. 아이콘은 진행 중 점 세 개 깜빡임 하나뿐.
  *
  * 판별은 백엔드 `src/api/utils/stage_progress.py` 가 쓰는 라벨 집합으로 한다.
  * 일반 reasoning 모델의 사고 과정은 여기 걸리지 않고 기존 Reasoning 으로 간다.
@@ -61,6 +64,26 @@ export function parseBklStages(text: string | null | undefined): BklStage[] | nu
   });
 }
 
+/** 헤더용 진행형 라벨 ("재검색" → "재검색 중") */
+const PROGRESSIVE: Record<string, string> = {
+  '검색 결과': '검색 결과 확인 중',
+  '범위 확인': '검색 범위 확인 중',
+};
+export const progressiveLabel = (label: string): string => PROGRESSIVE[label] ?? `${label} 중`;
+
+/** 진행 중 표시: 점 세 개가 순서대로 깜빡인다 */
+const PulseDots = () => (
+  <span className="inline-flex items-center gap-[3px]" aria-hidden="true">
+    {[0, 1, 2].map((i) => (
+      <span
+        key={i}
+        className="h-[5px] w-[5px] animate-pulse rounded-full bg-text-secondary"
+        style={{ animationDelay: `${i * 220}ms` }}
+      />
+    ))}
+  </span>
+);
+
 type Props = {
   stages: BklStage[];
   /** 최신 메시지가 아직 생성 중인가 */
@@ -105,10 +128,10 @@ const BklStageProgress = memo(({ stages, isStreaming, isLast }: Props) => {
   const current = stages[stages.length - 1];
   const headerLabel = useMemo(() => {
     if (inProgress) {
-      return current ? `검색 진행 중 — ${current.label}` : '검색 진행 중';
+      return current ? progressiveLabel(current.label) : '검색 진행 중';
     }
-    return `검색 과정 (${stages.length}단계)`;
-  }, [inProgress, current, stages.length]);
+    return '검색 과정';
+  }, [inProgress, current]);
 
   if (stages.length === 0) {
     return null;
@@ -116,40 +139,28 @@ const BklStageProgress = memo(({ stages, isStreaming, isLast }: Props) => {
 
   return (
     <div className="group/bkl-stage" data-testid="bkl-stage-progress">
-      <div className="mb-2 pb-2 pt-2">
+      <div className="pb-2 pt-1">
         <button
           type="button"
           onClick={handleClick}
           aria-expanded={isExpanded}
           aria-controls={contentId}
           className={cn(
-            'group/button flex w-full items-center justify-start rounded-lg leading-[18px]',
+            'group/button inline-flex items-center gap-2 rounded-md leading-[18px]',
             fontSize,
           )}
         >
-          <span className="relative mr-1.5 inline-flex h-[18px] w-[18px] items-center justify-center">
-            {inProgress ? (
-              <Loader2
-                className="icon-sm absolute animate-spin text-text-secondary opacity-100 transition-opacity group-hover/button:opacity-0"
-                aria-hidden="true"
-              />
-            ) : (
-              <Search
-                className="icon-sm absolute text-text-secondary opacity-100 transition-opacity group-hover/button:opacity-0"
-                aria-hidden="true"
-              />
-            )}
-            <ChevronDown
-              className={cn(
-                'icon-sm absolute transform-gpu text-text-primary opacity-0 transition-all duration-300 group-hover/button:opacity-100',
-                isExpanded && 'rotate-180',
-              )}
-              aria-hidden="true"
-            />
-          </span>
+          {inProgress && <PulseDots />}
           <span className={cn(inProgress ? 'text-text-primary' : 'text-text-secondary')}>
             {headerLabel}
           </span>
+          <ChevronDown
+            className={cn(
+              'h-3.5 w-3.5 transform-gpu text-text-secondary transition-transform duration-200',
+              isExpanded && 'rotate-180',
+            )}
+            aria-hidden="true"
+          />
         </button>
       </div>
       <div
@@ -163,7 +174,7 @@ const BklStageProgress = memo(({ stages, isStreaming, isLast }: Props) => {
         <div className="overflow-hidden">
           <ol
             className={cn(
-              'rounded-2xl border border-border-medium bg-surface-tertiary px-4 py-3 text-text-secondary',
+              'divide-y divide-border-light overflow-hidden rounded-xl border border-border-light',
               fontSize,
             )}
           >
@@ -172,33 +183,19 @@ const BklStageProgress = memo(({ stages, isStreaming, isLast }: Props) => {
               return (
                 <li
                   key={`${i}-${s.label}`}
-                  className="flex items-start gap-2 py-1 leading-[22px]"
+                  className="flex items-baseline gap-3 px-3.5 py-2 leading-[22px]"
                   data-testid="bkl-stage-row"
                   data-state={isCurrent ? 'running' : 'done'}
                 >
-                  <span className="mt-[3px] inline-flex h-4 w-4 flex-shrink-0 items-center justify-center">
-                    {isCurrent ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-text-primary" aria-hidden="true" />
-                    ) : (
-                      <Check className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+                  <span
+                    className={cn(
+                      'w-[6.5em] flex-shrink-0 text-[0.92em]',
+                      isCurrent ? 'text-text-primary' : 'text-text-secondary',
                     )}
+                  >
+                    {s.label}
                   </span>
-                  <span className="min-w-0">
-                    <span
-                      className={cn(
-                        'font-medium',
-                        isCurrent ? 'text-text-primary' : 'text-text-secondary',
-                      )}
-                    >
-                      {s.label}
-                    </span>
-                    {s.detail && (
-                      <span className="text-text-secondary">
-                        {' · '}
-                        {s.detail}
-                      </span>
-                    )}
-                  </span>
+                  <span className="min-w-0 flex-1 truncate text-text-primary">{s.detail}</span>
                 </li>
               );
             })}
