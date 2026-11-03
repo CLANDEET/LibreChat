@@ -52,6 +52,12 @@ export const filterBklDocs = atom<BklDocSelection[]>({
   default: [],
 });
 
+/** 파일명 부분일치 스코프 — "SSA" 처럼 파일명에 들어가는 키워드. null 이면 없음. */
+export const filterBklFileNamePattern = atom<string | null>({
+  key: 'bklFilterFileNamePattern',
+  default: null,
+});
+
 export const selectedBklMatters = atom<BklMatterSelection[]>({
   key: 'bklSelectedMatters',
   default: [],

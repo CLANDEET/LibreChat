@@ -86,6 +86,8 @@ export interface BklDoc {
 
 export interface BklDocsResponse {
   docs: BklDoc[];
+  /** 파일명 부분일치 총 건수(ACL 전). 구버전 백엔드면 없다. */
+  total?: number | null;
 }
 
 async function fetchDocs(q: string): Promise<BklDocsResponse> {

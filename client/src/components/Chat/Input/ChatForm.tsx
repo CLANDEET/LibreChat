@@ -27,6 +27,7 @@ import { parseBklQueryChoices } from '~/utils/bklFilter';
 import QueryChoicesPanel from '../Messages/Content/QueryChoicesPanel';
 import BklMatterMention from './BklMatterMention';
 import BklMatterChips from './BklMatterChips';
+import BklActiveFilterChips from './BklActiveFilterChips';
 import TextareaHeader from './TextareaHeader';
 import PromptsCommand from './PromptsCommand';
 import AudioRecorder from './AudioRecorder';
@@ -69,14 +70,8 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
 
   const { requiresKey } = useRequiresKey();
   const methods = useChatFormContext();
-  const {
-    files,
-    setFiles,
-    conversation,
-    isSubmitting,
-    filesLoading,
-    handleStopGenerating,
-  } = useChatContext();
+  const { files, setFiles, conversation, isSubmitting, filesLoading, handleStopGenerating } =
+    useChatContext();
   const {
     generateConversation,
     conversation: addedConvo,
@@ -144,7 +139,7 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     const parts = (latestMessage as any).content;
     if (Array.isArray(parts)) {
       for (const part of parts) {
-        const value = typeof part?.text === 'string' ? part.text : part?.text?.value ?? '';
+        const value = typeof part?.text === 'string' ? part.text : (part?.text?.value ?? '');
         if (value.startsWith('[BKL_QUERY_CHOICES:')) {
           const payload = parseBklQueryChoices(value);
           if (payload) return payload;
@@ -319,6 +314,7 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
           >
             <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
             <BklMatterChips />
+            <BklActiveFilterChips />
             {/* WIP */}
             <EditBadges
               isEditingChatBadges={isEditingBadges}
