@@ -35,7 +35,63 @@ function InputBox({
 }) {
   const [hovered, setHovered] = useState(false);
   const [toolbarFocused, setToolbarFocused] = useState(false);
-  const compact = forceCompact ?? (isInChat && !hovered && !toolbarFocused);
+  // ChatForm: toolbarBelow = isInChat && hoverCapable
+  const toolbarBelow = isInChat;
+  const compact = forceCompact ?? (toolbarBelow && !hovered && !toolbarFocused);
+
+  const sendControl = (
+    <button
+      type="button"
+      className="rounded-full bg-text-primary p-1.5 text-text-primary opacity-10"
+      disabled
+    >
+      <ArrowUp size={24} className="text-white" />
+    </button>
+  );
+
+  const toolbarRow = (
+    <div
+      className={cn(
+        '@container items-between relative flex flex-row items-center gap-2',
+        toolbarBelow ? 'px-1 pt-1' : 'pb-2',
+      )}
+      onFocus={() => setToolbarFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setToolbarFocused(false);
+        }
+      }}
+    >
+      <div className="ml-2">
+        <button
+          type="button"
+          className="flex size-9 items-center justify-center rounded-full p-1 hover:bg-surface-hover"
+        >
+          <Paperclip className="h-5 w-5" />
+        </button>
+      </div>
+      <CollapsibleBadges compact={compact} collapsible={toolbarBelow}>
+        <BadgeRow
+          showEphemeralBadges
+          isSubmitting={false}
+          conversationId={isInChat ? 'c1' : 'new'}
+          specName={undefined}
+          onChange={() => undefined}
+          isInChat={isInChat}
+        />
+      </CollapsibleBadges>
+      <div className="mx-auto flex" />
+      {toolbarBelow && <ToolbarDisclaimer visible={compact} />}
+      <button
+        type="button"
+        className="flex size-9 items-center justify-center rounded-full p-1 hover:bg-surface-hover"
+      >
+        <Mic className="h-5 w-5" />
+      </button>
+      {!toolbarBelow && <div className="mr-2">{sendControl}</div>}
+    </div>
+  );
+
   return (
     <div
       className="relative flex flex-col items-stretch"
@@ -43,67 +99,30 @@ function InputBox({
       data-testid={`box-${isInChat ? 'chat' : 'landing'}`}
     >
       <div
+        className="flex w-full flex-col"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className={cn(
-          'relative flex w-full flex-grow flex-col overflow-hidden rounded-3xl border border-border-light bg-surface-chat text-text-primary shadow-md transition-all duration-200',
-        )}
       >
-        <div className="flex flex-row">
-          <div className="relative flex-1">
-            <textarea
-              rows={1}
-              placeholder="메시지 BKL Prism"
-              className="m-0 w-full resize-none bg-transparent px-5 py-[13px] placeholder-black/60 outline-none md:py-3.5"
-              style={{ height: 44 }}
-            />
-          </div>
-        </div>
         <div
-          className="@container items-between relative flex flex-row gap-2 pb-2"
-          onFocus={() => setToolbarFocused(true)}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-              setToolbarFocused(false);
-            }
-          }}
+          data-testid="box"
+          className={cn(
+            'relative flex w-full flex-grow flex-col overflow-hidden rounded-3xl border border-border-light bg-surface-chat text-text-primary shadow-md transition-all duration-200',
+          )}
         >
-          <div className="ml-2">
-            <button
-              type="button"
-              className="flex size-9 items-center justify-center rounded-full p-1 hover:bg-surface-hover"
-            >
-              <Paperclip className="h-5 w-5" />
-            </button>
+          <div className="flex flex-row">
+            <div className="relative flex-1">
+              <textarea
+                rows={1}
+                placeholder="메시지 BKL Prism"
+                className="m-0 w-full resize-none bg-transparent px-5 py-[13px] placeholder-black/60 outline-none md:py-3.5"
+                style={{ height: 44 }}
+              />
+            </div>
+            {toolbarBelow && <div className="flex items-end pb-1 pr-2">{sendControl}</div>}
           </div>
-          <CollapsibleBadges compact={compact} collapsible={isInChat}>
-            <BadgeRow
-              showEphemeralBadges
-              isSubmitting={false}
-              conversationId={isInChat ? 'c1' : 'new'}
-              specName={undefined}
-              onChange={() => undefined}
-              isInChat={isInChat}
-            />
-          </CollapsibleBadges>
-          <div className="mx-auto flex" />
-          {isInChat && <ToolbarDisclaimer visible={compact} />}
-          <button
-            type="button"
-            className="flex size-9 items-center justify-center rounded-full p-1 hover:bg-surface-hover"
-          >
-            <Mic className="h-5 w-5" />
-          </button>
-          <div className="mr-2">
-            <button
-              type="button"
-              className="rounded-full bg-text-primary p-1.5 text-text-primary opacity-10"
-              disabled
-            >
-              <ArrowUp size={24} className="text-white" />
-            </button>
-          </div>
+          {!toolbarBelow && toolbarRow}
         </div>
+        {toolbarBelow && toolbarRow}
       </div>
       <p className="mt-1 text-center font-mono text-[10px] text-text-secondary">
         {isInChat ? 'chat' : 'landing'} · compact={String(compact)} · hovered={String(hovered)}
