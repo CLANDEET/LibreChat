@@ -85,7 +85,13 @@
     }
     if (!r.ok) {
       const b = await r.json().catch(() => ({}));
-      throw new Error(b.error || b.detail || path + ' → HTTP ' + r.status);
+      const d = b.error || b.detail;
+      // FastAPI 가 detail 을 객체로 줄 수 있다 ({message, test}) — 문자열화하되 원본도 붙인다.
+      const msg = typeof d === 'string' ? d : d && d.message ? d.message : path + ' → HTTP ' + r.status;
+      const err = new Error(msg);
+      err.detail = d;
+      err.status = r.status;
+      throw err;
     }
     return r.json();
   }

@@ -31,6 +31,7 @@
   }
 
   async function load() {
+    A.backendModels?.renderEditable().catch(console.error);
     const status = document.getElementById('settings-status');
     try {
       const j = await A.getJSON('/settings/models');

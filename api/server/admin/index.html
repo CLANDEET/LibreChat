@@ -200,6 +200,19 @@
 
       <div class="table-panel">
         <div class="table-header">
+          <span class="table-title">사용 중인 모델</span>
+          <span class="table-sub">채널별 현재 설정 — 호출이 아직 없어도 표시 · 단가가 없으면 미리 입력 · 변경은 <a class="link-tab" data-goto="settings">설정 탭</a></span>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>채널</th><th>모델</th><th>출처</th><th>엔드포인트</th><th>누적 호출</th><th>단가</th></tr></thead>
+            <tbody id="llm-active-tbody"><tr class="empty-row"><td colspan="6">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-panel">
+        <div class="table-header">
           <span class="table-title">모델 단가 (USD / 1M tokens)</span>
           <span class="table-sub">적용 시작일 기준 최신 행이 쓰입니다 · 과거 사용분까지 과금하려면 시작일을 앞당기세요</span>
         </div>
@@ -653,10 +666,33 @@
       <div class="page-header">
         <div>
           <div class="page-title">설정 — 모델 관리</div>
-          <div class="page-sub">사용 가능 모델 목록과 기본 모델을 지정합니다. 비워두면 librechat.yaml 값이 사용됩니다.</div>
+          <div class="page-sub">위: 채팅 화면 드롭다운에 보이는 모델(표시용). 아래: 백엔드가 실제로 호출하는 채널별 모델(재시작 없이 반영).</div>
         </div>
       </div>
-      <div class="form-panel">
+
+      <!-- 백엔드 채널 모델 (ai-api app_settings 런타임 오버라이드) -->
+      <div class="table-panel">
+        <div class="table-header">
+          <span class="table-title">백엔드 채널 모델</span>
+          <span class="table-sub" id="backend-models-sub">PG 오버라이드 → 환경변수 → 기본값 순으로 적용 · 저장 전 실제 엔드포인트로 연결 테스트</span>
+        </div>
+        <div class="notice-bar" style="margin:12px 16px 0;">
+          엔드포인트 URL·API 키는 환경변수 그대로입니다. 그 엔드포인트가 서빙하지 않는 모델명을 넣으면 해당 채널 호출이 전부 실패하므로, 연결 테스트가 통과해야 저장됩니다.
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>채널</th><th>현재 모델</th><th>출처</th><th>엔드포인트</th><th>변경</th><th></th></tr></thead>
+            <tbody id="backend-models-tbody"><tr class="empty-row"><td colspan="6">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-panel">
+        <div class="table-header">
+          <span class="table-title">채팅 UI 모델 목록</span>
+          <span class="table-sub">LibreChat 드롭다운에 보이는 목록·기본 선택. 비워두면 librechat.yaml 값 사용 — 백엔드 호출 모델에는 영향 없음</span>
+        </div>
+      <div class="form-panel" style="box-shadow:none; border:none; margin:0;">
         <div class="form-row"><label>엔드포인트</label><input type="text" id="settings-endpoint" value="BKL DB AI" /></div>
         <div class="form-row" style="align-items:flex-start;"><label>모델 목록</label>
           <div style="flex:1;">
@@ -670,6 +706,7 @@
           <button class="btn-export" id="btn-settings-save">저장</button>
         </div>
         <div class="form-hint" id="settings-status" style="margin-top:8px;"></div>
+      </div>
       </div>
     </div>
 
@@ -703,6 +740,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="/admin/js/core.js"></script>
 <script src="/admin/js/analytics.js"></script>
+<script src="/admin/js/backend_models.js"></script>
 <script src="/admin/js/llm.js"></script>
 <script src="/admin/js/history.js"></script>
 <script src="/admin/js/users.js"></script>

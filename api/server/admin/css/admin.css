@@ -446,3 +446,16 @@ button.src-modal-close.btn-refresh { font-size: 13px; color: #374151; }
 .btn-link { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 12px; padding: 2px 6px; }
 .btn-link:hover { color: #111827; text-decoration: underline; }
 .btn-link.danger:hover { color: #b91c1c; }
+.badge-src-db, .badge-src-env, .badge-src-default { white-space: nowrap; }
+.badge-src-db { background: #e0e7ff; color: #3730a3; }
+.badge-src-env { background: #f3f4f6; color: #374151; }
+.badge-src-default { background: #fef3c7; color: #92400e; }
+.link-tab { color: #4f46e5; cursor: pointer; text-decoration: underline; }
+.bm-input { height: 30px; padding: 0 8px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px; min-width: 220px; }
+.bm-input:focus { outline: none; border-color: #9ca3af; }
+.bm-msg { display: block; font-size: 11px; margin-top: 4px; color: #6b7280; max-width: 420px; white-space: normal; }
+.bm-msg.ok { color: #047857; }
+.bm-msg.err { color: #b91c1c; }
+.cell-model code { white-space: nowrap; }
+.mono-small { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: #6b7280; word-break: break-all; min-width: 240px; }
+.cell-desc .user-email { max-width: 360px; white-space: normal; }
