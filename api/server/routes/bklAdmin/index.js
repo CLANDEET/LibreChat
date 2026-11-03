@@ -2,7 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const { logger } = require('@librechat/data-schemas');
 const { requireAdminToken } = require('./middleware');
-const { getDb } = require('./helpers');
+const { getDb, loadUsers } = require('./helpers');
 
 const router = express.Router();
 
@@ -54,7 +54,9 @@ router.use('/analytics', async (req, res) => {
     res.status(response.status).json(response.data);
   } catch (err) {
     logger.error('[bklAdmin/analytics] upstream error', err?.message || err);
-    res.status(502).json({ error: 'analytics upstream error', detail: String(err?.message || err) });
+    res
+      .status(502)
+      .json({ error: 'analytics upstream error', detail: String(err?.message || err) });
   }
 });
 
@@ -105,8 +107,7 @@ router.use('/data', async (req, res) => {
       method: req.method,
       url: targetUrl,
       data: ['GET', 'HEAD'].includes(req.method.toUpperCase()) ? undefined : req.body,
-      headers:
-        req.method === 'GET' ? headers : { ...headers, 'Content-Type': 'application/json' },
+      headers: req.method === 'GET' ? headers : { ...headers, 'Content-Type': 'application/json' },
       timeout: 300_000,
       validateStatus: () => true,
     });
@@ -134,8 +135,7 @@ router.use('/sync', async (req, res) => {
       method: req.method,
       url: targetUrl,
       data: ['GET', 'HEAD'].includes(req.method.toUpperCase()) ? undefined : req.body,
-      headers:
-        req.method === 'GET' ? headers : { ...headers, 'Content-Type': 'application/json' },
+      headers: req.method === 'GET' ? headers : { ...headers, 'Content-Type': 'application/json' },
       timeout: 300_000,
       validateStatus: () => true,
     });
@@ -143,6 +143,65 @@ router.use('/sync', async (req, res) => {
   } catch (err) {
     logger.error('[bklAdmin/sync] upstream error', err?.message || err);
     res.status(502).json({ error: 'sync upstream error', detail: String(err?.message || err) });
+  }
+});
+
+/**
+ * FastAPI 모델·과금 프록시: /admin-api/llm-usage/* → ai-api /admin/llm-usage/*
+ * (llm_usage 토큰 집계 · llm_prices 단가 CRUD).
+ *
+ * /users 응답은 lc_user_id(LibreChat user _id) 만 들고 오므로 여기서 Mongo
+ * users 컬렉션으로 이름·이메일·그룹을 붙인다 — PG 쪽은 사용자 테이블이 없다.
+ */
+router.use('/llm-usage', async (req, res) => {
+  const baseUrl = process.env.BKL_API_BASE_URL || 'http://bkl-api:8000';
+  const targetUrl = `${baseUrl}/admin/llm-usage${req.url}`;
+  const headers = { Accept: 'application/json' };
+  if (process.env.IRE_API_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.IRE_API_TOKEN}`;
+  }
+  try {
+    const response = await axios({
+      method: req.method,
+      url: targetUrl,
+      data: ['GET', 'HEAD'].includes(req.method.toUpperCase()) ? undefined : req.body,
+      headers: req.method === 'GET' ? headers : { ...headers, 'Content-Type': 'application/json' },
+      timeout: 120_000,
+      validateStatus: () => true,
+    });
+    const data = response.data;
+    if (
+      response.status === 200 &&
+      req.method === 'GET' &&
+      req.path.startsWith('/users') &&
+      Array.isArray(data?.rows)
+    ) {
+      const ids = data.rows.map((r) => r.lc_user_id).filter(Boolean);
+      if (ids.length) {
+        const userMap = await loadUsers(getDb(), ids, {
+          name: 1,
+          username: 1,
+          email: 1,
+          bkl_group_name: 1,
+          bkl_div_name: 1,
+        });
+        for (const row of data.rows) {
+          const u = row.lc_user_id ? userMap.get(String(row.lc_user_id)) : null;
+          if (u) {
+            row.name = u.name || u.username || null;
+            row.email = u.email || null;
+            row.group_name = u.bkl_group_name || null;
+            row.department = u.bkl_div_name || null;
+          }
+        }
+      }
+    }
+    res.status(response.status).json(data);
+  } catch (err) {
+    logger.error('[bklAdmin/llm-usage] upstream error', err?.message || err);
+    res
+      .status(502)
+      .json({ error: 'llm-usage upstream error', detail: String(err?.message || err) });
   }
 });
 

@@ -25,6 +25,7 @@
     <div class="topbar-brand">BKL Prism <em>어드민</em></div>
     <nav class="topbar-tabs">
       <button class="tab-btn active" data-tab="analytics">통계</button>
+      <button class="tab-btn" data-tab="llm">모델·과금</button>
       <button class="tab-btn" data-tab="history">질의 이력</button>
       <button class="tab-btn" data-tab="users">사용자</button>
       <button class="tab-btn" data-tab="deleted">삭제된 채팅</button>
@@ -126,6 +127,118 @@
           <table>
             <thead><tr><th>시간 (KST)</th><th>사용자</th><th>그룹</th><th>구분</th><th>질의 내용</th></tr></thead>
             <tbody id="recent-tbody"><tr class="empty-row"><td colspan="5">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ════ 모델·과금 탭 (llm_usage 토큰 적재 집계 + llm_prices 단가) ════ -->
+    <div class="tab-panel" id="panel-llm">
+      <div class="page-header">
+        <div>
+          <div class="page-title">모델·과금</div>
+          <div class="page-sub" id="llm-sub">LLM 호출 토큰·추정 비용 (KST 일 기준)</div>
+        </div>
+        <div class="page-header-actions">
+          <select id="llm-channel" class="select-inline" title="채널">
+            <option value="">전체 채널</option>
+            <option value="answer">answer · 답변 생성</option>
+            <option value="retrieval">retrieval · 검색/쿼리 분석</option>
+            <option value="indexing">indexing · 색인 메타 추출</option>
+            <option value="summarizer">summarizer · 문서/사건 요약</option>
+            <option value="system_task">system_task · 제목 등</option>
+          </select>
+          <select id="llm-model" class="select-inline" title="모델"><option value="">전체 모델</option></select>
+          <div id="range-llm"></div>
+          <button class="btn-export" id="btn-export-llm">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v8M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1"/></svg>
+            엑셀 내보내기
+          </button>
+        </div>
+      </div>
+
+      <div class="notice-bar" id="llm-unpriced-notice" style="display:none;"></div>
+
+      <div class="cards-row" id="llm-cards">
+        <div class="card"><div class="card-label">추정 비용</div><div class="card-value" id="llm-c-cost">—</div><div class="card-sub" id="llm-c-cost-sub">—</div></div>
+        <div class="card"><div class="card-label">호출 수</div><div class="card-value" id="llm-c-calls">—</div><div class="card-sub" id="llm-c-calls-sub">—</div></div>
+        <div class="card"><div class="card-label">입력 토큰</div><div class="card-value" id="llm-c-in">—</div><div class="card-sub" id="llm-c-in-sub">—</div></div>
+        <div class="card"><div class="card-label">출력 토큰</div><div class="card-value" id="llm-c-out">—</div><div class="card-sub" id="llm-c-out-sub">—</div></div>
+        <div class="card"><div class="card-label">실패율</div><div class="card-value" id="llm-c-err">—</div><div class="card-sub" id="llm-c-err-sub">—</div></div>
+        <div class="card"><div class="card-label">지연 (p95)</div><div class="card-value" id="llm-c-lat">—</div><div class="card-sub" id="llm-c-lat-sub">—</div></div>
+      </div>
+
+      <div class="charts-row cols-2">
+        <div class="chart-panel"><div class="chart-title">일별 추정 비용 (USD) · 모델별</div><div class="chart-canvas-wrap"><canvas id="llm-daily-cost-chart"></canvas></div></div>
+        <div class="chart-panel"><div class="chart-title">일별 토큰 · 입력/출력</div><div class="chart-canvas-wrap"><canvas id="llm-daily-tokens-chart"></canvas></div></div>
+      </div>
+      <div class="charts-row cols-2">
+        <div class="chart-panel"><div class="chart-title">채널별 비용 비중</div><div class="chart-canvas-wrap"><canvas id="llm-channel-chart"></canvas></div></div>
+        <div class="chart-panel"><div class="chart-title">용도별 호출 수</div><div class="chart-canvas-wrap"><canvas id="llm-purpose-chart"></canvas></div></div>
+      </div>
+
+      <div class="table-panel">
+        <div class="table-header"><span class="table-title">모델별</span><span class="table-sub">비용 내림차순 · 단가 없는 모델은 비용 0 으로 집계</span></div>
+        <div class="table-scroll" style="max-height:360px;">
+          <table>
+            <thead><tr><th>모델</th><th>제공자</th><th>호출</th><th>입력</th><th>캐시</th><th>출력</th><th>thinking</th><th>실패율</th><th>p95 지연</th><th>추정 비용</th><th>단가</th></tr></thead>
+            <tbody id="llm-models-tbody"><tr class="empty-row"><td colspan="11">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-panel">
+        <div class="table-header"><span class="table-title">사용자별 상위</span><span class="table-sub">lc_user_id 귀속 · 귀속 없는 행(워커 색인·요약)은 "시스템"</span></div>
+        <div class="table-scroll" style="max-height:380px;">
+          <table>
+            <thead><tr><th>사용자</th><th>그룹</th><th>부서</th><th>질의</th><th>호출</th><th>입력</th><th>출력</th><th>추정 비용</th></tr></thead>
+            <tbody id="llm-users-tbody"><tr class="empty-row"><td colspan="8">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-panel">
+        <div class="table-header">
+          <span class="table-title">모델 단가 (USD / 1M tokens)</span>
+          <span class="table-sub">적용 시작일 기준 최신 행이 쓰입니다 · 과거 사용분까지 과금하려면 시작일을 앞당기세요</span>
+        </div>
+        <div class="llm-price-form" id="llm-price-form">
+          <div class="form-row">
+            <label>모델</label>
+            <input type="text" id="llm-p-model" list="llm-model-list" placeholder="gemini-3.8-flash" />
+            <datalist id="llm-model-list"></datalist>
+            <label>적용 시작일</label>
+            <input type="date" id="llm-p-from" />
+          </div>
+          <div class="form-row">
+            <label>입력 $/1M</label><input type="number" id="llm-p-in" min="0" step="0.0001" placeholder="0.30" />
+            <label>출력 $/1M</label><input type="number" id="llm-p-out" min="0" step="0.0001" placeholder="2.50" />
+            <label>캐시 $/1M</label><input type="number" id="llm-p-cached" min="0" step="0.0001" placeholder="(비우면 입력 단가)" />
+          </div>
+          <div class="form-row">
+            <label>메모</label><input type="text" id="llm-p-note" placeholder="예: 2026-11 공식 단가" />
+            <button class="btn-refresh" id="llm-p-save">저장</button>
+            <span id="llm-p-msg" class="form-msg"></span>
+          </div>
+        </div>
+        <div class="table-scroll" style="max-height:320px;">
+          <table>
+            <thead><tr><th>모델</th><th>적용 시작일</th><th>입력</th><th>출력</th><th>캐시</th><th>메모</th><th>수정</th><th></th></tr></thead>
+            <tbody id="llm-prices-tbody"><tr class="empty-row"><td colspan="8">로딩 중...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-panel">
+        <div class="table-header">
+          <span class="table-title">최근 호출</span>
+          <span class="table-sub"><label class="inline-check"><input type="checkbox" id="llm-recent-errors" /> 실패만</label> · 최근 50건</span>
+        </div>
+        <div class="table-scroll" style="max-height:380px;">
+          <table>
+            <thead><tr><th>시간 (KST)</th><th>채널</th><th>용도</th><th>모델</th><th>입력</th><th>출력</th><th>지연</th><th>상태</th><th>비용</th><th>프로세스</th></tr></thead>
+            <tbody id="llm-recent-tbody"><tr class="empty-row"><td colspan="10">로딩 중...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -590,6 +703,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="/admin/js/core.js"></script>
 <script src="/admin/js/analytics.js"></script>
+<script src="/admin/js/llm.js"></script>
 <script src="/admin/js/history.js"></script>
 <script src="/admin/js/users.js"></script>
 <script src="/admin/js/deleted.js"></script>
