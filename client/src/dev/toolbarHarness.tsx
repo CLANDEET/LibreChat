@@ -13,6 +13,7 @@ import { createRoot } from 'react-dom/client';
 import { RecoilRoot } from 'recoil';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Paperclip, Mic, ArrowUp } from 'lucide-react';
+import { TextareaAutosize } from '@librechat/client';
 import { useForm } from 'react-hook-form';
 import { ChatFormProvider } from '~/Providers';
 import { AuthContext } from '~/hooks/AuthContext';
@@ -111,11 +112,13 @@ function InputBox({
         >
           <div className="flex flex-row">
             <div className="relative flex-1">
-              <textarea
+              <TextareaAutosize
                 rows={1}
+                aria-label="메시지 BKL Prism"
                 placeholder="메시지 BKL Prism"
-                className="m-0 w-full resize-none bg-transparent px-5 py-[13px] placeholder-black/60 outline-none md:py-3.5"
-                style={{ height: 44 }}
+                data-testid="text-input"
+                className="scrollbar-hover m-0 w-full resize-none bg-transparent px-5 py-[13px] placeholder-black/60 outline-none transition-[max-height] duration-200 md:py-3.5"
+                style={{ height: 44, overflowY: 'auto' }}
               />
             </div>
             {toolbarBelow && <div className="flex items-end pb-1 pr-2">{sendControl}</div>}
