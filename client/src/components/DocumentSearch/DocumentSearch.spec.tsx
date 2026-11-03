@@ -105,7 +105,7 @@ jest.mock('./FilterBar', () => ({
   resolvePeriodRange: () => ({ from: undefined, to: undefined }),
 }));
 
-import DocumentSearch from './DocumentSearch';
+import DocumentSearch, { toApiFilters } from './DocumentSearch';
 
 function hits(n: number): DocumentHit[] {
   return Array.from({ length: n }, (_, i) => ({
@@ -304,5 +304,36 @@ describe('전체 선택', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: '전체 선택 (25건)' }));
     expect(screen.getByText('25건 선택')).toBeInTheDocument();
+  });
+});
+
+describe('toApiFilters 매터 범위', () => {
+  const base = {
+    preset: 'all',
+    startDate: null,
+    endDate: null,
+    extensionGroups: [],
+    library: 'all',
+    matters: [],
+  } as any;
+
+  it('매터가 없으면 matter_uids 를 보내지 않는다', () => {
+    expect(toApiFilters(base)).toBeUndefined();
+  });
+
+  it('선택한 매터의 uid 배열을 matter_uids 로 보낸다', () => {
+    const f = {
+      ...base,
+      matters: [
+        { matter_uid: '1001', label: 'a' },
+        { matter_uid: '1002', label: 'b' },
+      ],
+    };
+    expect(toApiFilters(f)).toEqual({ matter_uids: ['1001', '1002'] });
+  });
+
+  it('DB 라이브러리 범위에서는 매터를 무시한다', () => {
+    const f = { ...base, library: 'knowledge', matters: [{ matter_uid: '1001', label: 'a' }] };
+    expect(toApiFilters(f)).toEqual({ library: 'knowledge' });
   });
 });

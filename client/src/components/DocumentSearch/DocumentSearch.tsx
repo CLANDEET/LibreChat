@@ -43,13 +43,16 @@ function getAppTitle(): string {
   return BKL_APP_TITLE;
 }
 
-function toApiFilters(f: DocumentSearchFilterState): KeywordSearchFilters | undefined {
+export function toApiFilters(f: DocumentSearchFilterState): KeywordSearchFilters | undefined {
   const { from, to } = resolvePeriodRange(f);
   const out: KeywordSearchFilters = {};
   if (from) out.date_from = from;
   if (to) out.date_to = to;
   if (f.extensionGroups.length) out.extension_groups = f.extensionGroups;
   if (f.library && f.library !== 'all') out.library = f.library;
+  // 매터 범위 — 지식DB 범위에서는 의미가 없으므로 보내지 않는다
+  const matterUids = (f.matters ?? []).map((m) => m.matter_uid).filter(Boolean);
+  if (matterUids.length && f.library !== 'knowledge') out.matter_uids = matterUids;
   return Object.keys(out).length ? out : undefined;
 }
 
