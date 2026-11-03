@@ -49,16 +49,36 @@ const BY_DOC_KEY = '__by_doc_id__';
 
 type HyperlinksResponse = { mapping?: Record<string, unknown> };
 
+/** 진단용: `window.__bklHyperlinkTrace = []` 를 켜 두면 치환 내역이 쌓인다. */
+type HyperlinkTraceEntry = {
+  name: string;
+  shown: string;
+  url: string | null;
+  before: string | undefined;
+  after: string;
+};
+
 type BklWindow = Window & {
   __bklRids?: Record<string, string>;
   __bklSources?: Record<string, BklSource[]>;
+  __bklHyperlinkTrace?: HyperlinkTraceEntry[];
 };
 
 const BKL_API = '/bkl';
 const RID_RE = /<!--\s*bkl_rid:([A-Za-z0-9_-]+)\s*-->/;
-const MD_LINK_RE = /^\[(?:『)?([^』\]]+)(?:』)?\]\((.+)\)$/;
 /** 『파일명』 — 이미 링크 텍스트인 경우( `[『…』](` )는 치환하지 않는다. */
 const FILE_MENTION_RE = /『([^『』\n]+)』/g;
+/**
+ * 링크 텍스트(파일명) 안에서 마크다운 인라인 문법으로 읽힐 수 있는 ASCII 문장부호.
+ * 이메일 파일명은 `RE_ 제목 [BKL-M.FID…]_4733289.msg` 처럼 대괄호·밑줄을 품고
+ * 있어 `[...]` 중첩, `_…_`/`*…*` 강조, `~…~` 취소선, 백틱이 링크 텍스트를
+ * 쪼개거나 꾸밀 수 있다. 역슬래시 이스케이프는 렌더 결과에 글자 그대로 남는다.
+ */
+const MD_LABEL_ESCAPE_RE = /([\\`*_~[\]<>])/g;
+
+function escapeMarkdownLabel(label: string): string {
+  return label.replace(MD_LABEL_ESCAPE_RE, '\\$1');
+}
 /** 답변 저장 직후 매핑이 아직 PG 에 없을 수 있어 나눠 시도한다. */
 const FETCH_RETRY_DELAYS_MS = [0, 1500, 4000];
 
@@ -88,10 +108,18 @@ function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value) && !value.includes('|');
 }
 
+/**
+ * 서버 지도 값 `[『파일명』](url)` 또는 맨 URL 에서 URL 만. 파일명에 `]` 가 들어
+ * 있어도(`[BKL-M.FID…]`) 마지막 `](` 를 경계로 잘라 URL 을 잃지 않는다.
+ */
 function urlFromMappingValue(value: unknown): string | null {
   if (typeof value !== 'string' || !value) return null;
-  const link = value.match(MD_LINK_RE);
-  const url = (link ? link[2] : value).trim();
+  let url = value.trim();
+  if (url.startsWith('[') && url.endsWith(')')) {
+    const cut = url.lastIndexOf('](');
+    if (cut !== -1) url = url.slice(cut + 2, -1).trim();
+  }
+  if (url.startsWith('<') && url.endsWith('>')) url = url.slice(1, -1).trim();
   return isHttpUrl(url) ? url : null;
 }
 
@@ -323,14 +351,19 @@ export function applyBklAnswerHyperlinks(
   const resolver =
     lookup instanceof Map ? resolverFromMaps(lookup) : (lookup as BklHyperlinkResolver);
   if (!resolver) return text;
+  const trace = typeof window !== 'undefined' ? (window as BklWindow).__bklHyperlinkTrace : null;
   return text.replace(FILE_MENTION_RE, (full: string, name: string, offset: number) => {
     const before = text[offset - 1];
     const end = offset + full.length;
     const after = text.slice(end, end + 2);
     const shown = displayMention(resolver, name);
-    if (before === '[' && after === '](') return shown;
-    const url = resolveUrl(resolver, name, text.slice(end, end + 12));
-    return url ? `[${shown}](<${url}>)` : shown;
+    const alreadyLinked = before === '[' && after === '](';
+    const url = alreadyLinked ? null : resolveUrl(resolver, name, text.slice(end, end + 12));
+    if (Array.isArray(trace)) trace.push({ name, shown, url, before, after });
+    // 링크 텍스트가 될 자리는 파일명의 `[ ] _ * ~` 등이 마크다운으로 읽히지
+    // 않게 이스케이프한다 (렌더 결과는 글자 그대로).
+    if (alreadyLinked) return escapeMarkdownLabel(shown);
+    return url ? `[${escapeMarkdownLabel(shown)}](<${url}>)` : shown;
   });
 }
 
