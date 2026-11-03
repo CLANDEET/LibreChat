@@ -1,5 +1,14 @@
 import { useMemo } from 'react';
-import { AtSign, Briefcase, Calendar, FileText, FileType, Library, Sparkles } from 'lucide-react';
+import {
+  AtSign,
+  Briefcase,
+  Calendar,
+  FileText,
+  FileType,
+  Library,
+  Search,
+  Sparkles,
+} from 'lucide-react';
 import type { TMessage } from 'librechat-data-provider';
 import type { ReactNode } from 'react';
 import { cn } from '~/utils';
@@ -13,6 +22,7 @@ interface BklMeta {
   filterMatterUids?: string[];
   filterDocIds?: string[];
   filterDocLabels?: string[];
+  fileNameContains?: string;
   referenceMatterUids?: string[];
   queryEnhanced?: boolean;
 }
@@ -55,6 +65,10 @@ const parseBklMeta = (text: string | null | undefined): BklMeta | null => {
       }
       if (payload.doc_labels) {
         meta.filterDocLabels = String(payload.doc_labels).split(',').filter(Boolean);
+      }
+      if (payload.file_name_contains && String(payload.file_name_contains).trim()) {
+        meta.fileNameContains = String(payload.file_name_contains).trim();
+        found = true;
       }
     } catch {
       // Ignore malformed historical tags.
@@ -173,6 +187,17 @@ export default function BklMessageMeta({ message }: { message?: TMessage }) {
         icon={<Briefcase className="h-3 w-3 shrink-0 text-blue-500" aria-hidden="true" />}
         label={`사건: ${resolveMatterLabels(meta.filterMatterUids)}`}
         className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300"
+      />,
+    );
+  }
+
+  if (meta.fileNameContains) {
+    chips.push(
+      <Chip
+        key="filter-file-name"
+        icon={<Search className="h-3 w-3 shrink-0 text-purple-500" aria-hidden="true" />}
+        label={`파일명: ${meta.fileNameContains}`}
+        className="border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/10 dark:text-purple-300"
       />,
     );
   }
