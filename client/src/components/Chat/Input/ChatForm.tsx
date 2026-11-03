@@ -251,13 +251,11 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     () => typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover)').matches,
     [],
   );
+  // 대화 중(hover 가능 기기)에는 입력창 박스를 텍스트 한 줄 + 전송 버튼만으로 두고,
+  // 첨부·배지·마이크 도구줄은 박스 **바깥 아래** 얇은 줄로 뺀다 (Claude 식).
+  const toolbarBelow = isInChat && hoverCapable;
   const isToolbarCompact =
-    isInChat &&
-    hoverCapable &&
-    !isFormHovered &&
-    !isToolbarFocused &&
-    !isEditingBadges &&
-    files.size === 0;
+    toolbarBelow && !isFormHovered && !isToolbarFocused && !isEditingBadges && files.size === 0;
 
   const baseClasses = useMemo(
     () =>
@@ -267,6 +265,66 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
         isMoreThanThreeRows ? 'pl-5' : 'px-5',
       ),
     [isCollapsed, isMoreThanThreeRows],
+  );
+
+  const sendControl =
+    isSubmitting && showStopButton ? (
+      <StopButton stop={handleStopGenerating} setShowStopButton={setShowStopButton} />
+    ) : (
+      endpoint && (
+        <SendButton
+          ref={submitButtonRef}
+          control={methods.control}
+          disabled={filesLoading || isSubmitting || disableInputs || isNotAppendable}
+        />
+      )
+    );
+
+  // 첨부 · 배지(필터/검색/쿼리 강화) · 마이크 (· 전송) 도구줄. 대기화면에서는 박스 안
+  // 마지막 줄, 대화 중에는 박스 아래 얇은 줄(전송 버튼은 텍스트 줄로 이동).
+  const toolbarRow = (
+    <div
+      className={cn(
+        '@container items-between relative flex items-center gap-2',
+        isRTL ? 'flex-row-reverse' : 'flex-row',
+        toolbarBelow ? 'px-1 pt-1' : 'pb-2',
+      )}
+      data-testid="bkl-chat-toolbar"
+      onFocus={() => setIsToolbarFocused(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setIsToolbarFocused(false);
+        }
+      }}
+    >
+      <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
+        <AttachFileChat conversation={conversation} disableInputs={disableInputs} />
+      </div>
+      <CollapsibleBadges compact={isToolbarCompact} collapsible={toolbarBelow}>
+        <BadgeRow
+          showEphemeralBadges={
+            !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
+          }
+          isSubmitting={isSubmitting}
+          conversationId={conversationId}
+          specName={conversation?.spec}
+          onChange={setBadges}
+          isInChat={isInChat}
+        />
+      </CollapsibleBadges>
+      <div className="mx-auto flex" />
+      {toolbarBelow && <ToolbarDisclaimer visible={isToolbarCompact} />}
+      {SpeechToText && (
+        <AudioRecorder
+          methods={methods}
+          ask={submitMessage}
+          textAreaRef={textAreaRef}
+          disabled={disableInputs || isNotAppendable}
+          isSubmitting={isSubmitting}
+        />
+      )}
+      {!toolbarBelow && <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>{sendControl}</div>}
+    </div>
   );
 
   if (queryChoicesPayload) {
@@ -303,155 +361,116 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
       )}
     >
       <div className="relative flex h-full flex-1 items-stretch md:flex-col">
-        <div className={cn('flex w-full items-center', isRTL && 'flex-row-reverse')}>
-          {showPlusPopover && !isAssistantsEndpoint(endpoint) && (
-            <Mention
-              setShowMentionPopover={setShowPlusPopover}
-              newConversation={generateConversation}
-              textAreaRef={textAreaRef}
-              commandChar="+"
-              placeholder="com_ui_add_model_preset"
-              includeAssistants={false}
-            />
-          )}
-          {showMentionPopover && (
-            <BklMatterMention
-              setShowMentionPopover={setShowMentionPopover}
-              textAreaRef={textAreaRef}
-            />
-          )}
-          <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
-          <div
-            onClick={handleContainerClick}
-            onMouseEnter={() => setIsFormHovered(true)}
-            onMouseLeave={() => setIsFormHovered(false)}
-            className={cn(
-              'relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border pb-4 text-text-primary transition-all duration-200 sm:rounded-3xl sm:pb-0',
-              isTextAreaFocused ? 'shadow-lg' : 'shadow-md',
-              isTemporary
-                ? 'border-violet-800/60 bg-violet-950/10'
-                : 'border-border-light bg-surface-chat',
+        <div
+          className="flex w-full flex-col"
+          onMouseEnter={() => setIsFormHovered(true)}
+          onMouseLeave={() => setIsFormHovered(false)}
+        >
+          <div className={cn('flex w-full items-center', isRTL && 'flex-row-reverse')}>
+            {showPlusPopover && !isAssistantsEndpoint(endpoint) && (
+              <Mention
+                setShowMentionPopover={setShowPlusPopover}
+                newConversation={generateConversation}
+                textAreaRef={textAreaRef}
+                commandChar="+"
+                placeholder="com_ui_add_model_preset"
+                includeAssistants={false}
+              />
             )}
-          >
-            <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
-            <BklMatterChips />
-            <BklActiveFilterChips />
-            {/* WIP */}
-            <EditBadges
-              isEditingChatBadges={isEditingBadges}
-              handleCancelBadges={handleCancelBadges}
-              handleSaveBadges={handleSaveBadges}
-              setBadges={setBadges}
-            />
-            <FileFormChat conversation={conversation} />
-            {endpoint && (
-              <div className={cn('flex', isRTL ? 'flex-row-reverse' : 'flex-row')}>
-                <div
-                  className="relative flex-1"
-                  style={
-                    isCollapsed
-                      ? {
-                          WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 90%)',
-                          maskImage: 'linear-gradient(to bottom, black 60%, transparent 90%)',
-                        }
-                      : undefined
-                  }
-                >
-                  <TextareaAutosize
-                    {...registerProps}
-                    ref={(e) => {
-                      ref(e);
-                      (textAreaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current =
-                        e;
-                    }}
-                    disabled={disableInputs || isNotAppendable}
-                    onPaste={handlePaste}
-                    onKeyDown={handleKeyDown}
-                    onKeyUp={handleKeyUp}
-                    onCompositionStart={handleCompositionStart}
-                    onCompositionEnd={handleCompositionEnd}
-                    id={mainTextareaId}
-                    tabIndex={0}
-                    data-testid="text-input"
-                    rows={1}
-                    onFocus={() => {
-                      handleFocusOrClick();
-                      setIsTextAreaFocused(true);
-                    }}
-                    onBlur={setIsTextAreaFocused.bind(null, false)}
-                    aria-label={localize('com_ui_message_input')}
-                    onClick={handleFocusOrClick}
-                    style={{ height: 44, overflowY: 'auto' }}
-                    className={cn(
-                      baseClasses,
-                      removeFocusRings,
-                      'scrollbar-hover transition-[max-height] duration-200 disabled:cursor-not-allowed',
-                    )}
-                  />
-                </div>
-                <div className="flex flex-col items-start justify-start pr-2.5 pt-1.5">
-                  <CollapseChat
-                    isCollapsed={isCollapsed}
-                    isScrollable={isMoreThanThreeRows}
-                    setIsCollapsed={setIsCollapsed}
-                  />
-                </div>
-              </div>
+            {showMentionPopover && (
+              <BklMatterMention
+                setShowMentionPopover={setShowMentionPopover}
+                textAreaRef={textAreaRef}
+              />
             )}
+            <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
             <div
+              onClick={handleContainerClick}
               className={cn(
-                '@container items-between relative flex gap-2 pb-2',
-                isRTL ? 'flex-row-reverse' : 'flex-row',
+                'relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border pb-4 text-text-primary transition-all duration-200 sm:rounded-3xl sm:pb-0',
+                isTextAreaFocused ? 'shadow-lg' : 'shadow-md',
+                isTemporary
+                  ? 'border-violet-800/60 bg-violet-950/10'
+                  : 'border-border-light bg-surface-chat',
               )}
-              onFocus={() => setIsToolbarFocused(true)}
-              onBlur={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                  setIsToolbarFocused(false);
-                }
-              }}
             >
-              <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
-                <AttachFileChat conversation={conversation} disableInputs={disableInputs} />
-              </div>
-              <CollapsibleBadges compact={isToolbarCompact} collapsible={isInChat && hoverCapable}>
-                <BadgeRow
-                  showEphemeralBadges={
-                    !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
-                  }
-                  isSubmitting={isSubmitting}
-                  conversationId={conversationId}
-                  specName={conversation?.spec}
-                  onChange={setBadges}
-                  isInChat={isInChat}
-                />
-              </CollapsibleBadges>
-              <div className="mx-auto flex" />
-              {isInChat && <ToolbarDisclaimer visible={isToolbarCompact} />}
-              {SpeechToText && (
-                <AudioRecorder
-                  methods={methods}
-                  ask={submitMessage}
-                  textAreaRef={textAreaRef}
-                  disabled={disableInputs || isNotAppendable}
-                  isSubmitting={isSubmitting}
-                />
-              )}
-              <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>
-                {isSubmitting && showStopButton ? (
-                  <StopButton stop={handleStopGenerating} setShowStopButton={setShowStopButton} />
-                ) : (
-                  endpoint && (
-                    <SendButton
-                      ref={submitButtonRef}
-                      control={methods.control}
-                      disabled={filesLoading || isSubmitting || disableInputs || isNotAppendable}
+              <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
+              <BklMatterChips />
+              <BklActiveFilterChips />
+              {/* WIP */}
+              <EditBadges
+                isEditingChatBadges={isEditingBadges}
+                handleCancelBadges={handleCancelBadges}
+                handleSaveBadges={handleSaveBadges}
+                setBadges={setBadges}
+              />
+              <FileFormChat conversation={conversation} />
+              {endpoint && (
+                <div className={cn('flex', isRTL ? 'flex-row-reverse' : 'flex-row')}>
+                  <div
+                    className="relative flex-1"
+                    style={
+                      isCollapsed
+                        ? {
+                            WebkitMaskImage:
+                              'linear-gradient(to bottom, black 60%, transparent 90%)',
+                            maskImage: 'linear-gradient(to bottom, black 60%, transparent 90%)',
+                          }
+                        : undefined
+                    }
+                  >
+                    <TextareaAutosize
+                      {...registerProps}
+                      ref={(e) => {
+                        ref(e);
+                        (
+                          textAreaRef as React.MutableRefObject<HTMLTextAreaElement | null>
+                        ).current = e;
+                      }}
+                      disabled={disableInputs || isNotAppendable}
+                      onPaste={handlePaste}
+                      onKeyDown={handleKeyDown}
+                      onKeyUp={handleKeyUp}
+                      onCompositionStart={handleCompositionStart}
+                      onCompositionEnd={handleCompositionEnd}
+                      id={mainTextareaId}
+                      tabIndex={0}
+                      data-testid="text-input"
+                      rows={1}
+                      onFocus={() => {
+                        handleFocusOrClick();
+                        setIsTextAreaFocused(true);
+                      }}
+                      onBlur={setIsTextAreaFocused.bind(null, false)}
+                      aria-label={localize('com_ui_message_input')}
+                      onClick={handleFocusOrClick}
+                      style={{ height: 44, overflowY: 'auto' }}
+                      className={cn(
+                        baseClasses,
+                        removeFocusRings,
+                        'scrollbar-hover transition-[max-height] duration-200 disabled:cursor-not-allowed',
+                      )}
                     />
-                  )
-                )}
-              </div>
+                  </div>
+                  <div className="flex flex-col items-start justify-start pr-2.5 pt-1.5">
+                    <CollapseChat
+                      isCollapsed={isCollapsed}
+                      isScrollable={isMoreThanThreeRows}
+                      setIsCollapsed={setIsCollapsed}
+                    />
+                  </div>
+                  {toolbarBelow && (
+                    <div className={cn('flex items-end pb-1', isRTL ? 'pl-2' : 'pr-2')}>
+                      {sendControl}
+                    </div>
+                  )}
+                </div>
+              )}
+              {!toolbarBelow && toolbarRow}
+              {TextToSpeech && automaticPlayback && <StreamAudio index={index} />}
             </div>
-            {TextToSpeech && automaticPlayback && <StreamAudio index={index} />}
           </div>
+          {toolbarBelow && toolbarRow}
         </div>
       </div>
     </form>
