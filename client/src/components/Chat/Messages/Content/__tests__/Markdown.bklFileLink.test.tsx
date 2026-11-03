@@ -34,6 +34,7 @@ const NAMES = [
   'FW_ [외부] 2024_06_14_계약서_v2 [BKL-M.FID28600]_123456789.msg',
   'HDC,LCC_합병,주식취득(일반)_기업결합신고_251126.pdf.md',
   'RE: 담보 검토 *메모* [BKL-M.FID28600].msg',
+  '법무법인(유한)태평양 피청구인 답변서 (2022-1386 도로점용허가 반려처분 등 취소_ 신세계건설 주식회사 vs. 양주시장) [BKL-M.FID2859888].msg',
 ];
 
 const urlFor = (i: number) => `https://imanage.example.com/work/link/d/KR!${1000 + i}.1`;
@@ -85,5 +86,9 @@ describe('Markdown × 검색 문서 리스트 파일명 링크', () => {
     // 이스케이프는 렌더 결과에 남지 않는다
     expect(cells[0].textContent).toBe('『RE_ SPC 대주단 담보 제공 관련 [BKL-M.FID2086960].msg』');
     expect(cells[5].textContent).toBe('『RE: 담보 검토 *메모* [BKL-M.FID28600].msg』');
+    // 역슬래시 이스케이프(`\[…\]`)는 운영에서 KaTeX 수식이 됐다 — 마크다운에 역슬래시가 남지 않아야 한다
+    expect(text).not.toMatch(/\\[[\]_*~`<>\\]/);
+    expect(container.querySelector('.katex, .math, math')).toBeNull();
+    expect(cells[6].textContent).toContain('[BKL-M.FID2859888].msg』');
   });
 });

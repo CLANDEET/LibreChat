@@ -104,7 +104,9 @@ function ChatView({ index = 0 }: { index?: number }) {
                   >
                     <ChatForm index={index} />
                     {isLandingPage && <BklFeatureCarousel />}
-                    {isLandingPage ? <ConversationStarters /> : <Footer />}
+                    {/* 버전·태그라인 푸터는 대기화면에만 — 대화 중에는 입력창
+                        도구줄의 면책 문구(ChatForm)가 대신한다. */}
+                    {isLandingPage && <ConversationStarters />}
                   </div>
                 </div>
                 {isLandingPage && <Footer />}

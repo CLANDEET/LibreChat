@@ -23,6 +23,7 @@ import { mainTextareaId, BadgeItem } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
 import { cn, removeFocusRings } from '~/utils';
+import { BKL_AI_DISCLAIMER } from '~/components/Bkl/brand';
 import { parseBklQueryChoices } from '~/utils/bklFilter';
 import QueryChoicesPanel from '../Messages/Content/QueryChoicesPanel';
 import BklMatterMention from './BklMatterMention';
@@ -51,6 +52,8 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
   const [visualRowCount, setVisualRowCount] = useState(1);
   const [isTextAreaFocused, setIsTextAreaFocused] = useState(false);
   const [backupBadges, setBackupBadges] = useState<Pick<BadgeItem, 'id'>[]>([]);
+  const [isFormHovered, setIsFormHovered] = useState(false);
+  const [isToolbarFocused, setIsToolbarFocused] = useState(false);
 
   const SpeechToText = useRecoilValue(store.speechToText);
   const TextToSpeech = useRecoilValue(store.textToSpeech);
@@ -239,6 +242,23 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
 
   const isMoreThanThreeRows = visualRowCount > 3;
 
+  const isInChat = Array.isArray(conversation?.messages) && conversation.messages.length >= 1;
+  // 대화 중에는 입력창 아래 도구줄(필터·검색·쿼리 강화)을 접어 두고 "Prism은 AI이므로…"
+  // 한 줄만 보여 읽기 영역을 넓힌다. 마우스를 올리거나(hover) 키보드로 도구줄에
+  // 들어오면(focus-within), 또는 파일 첨부·배지 편집 중이면 펼친다. hover 가 없는
+  // 터치 기기에서는 항상 펼친 상태.
+  const hoverCapable = useMemo(
+    () => typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover)').matches,
+    [],
+  );
+  const isToolbarCompact =
+    isInChat &&
+    hoverCapable &&
+    !isFormHovered &&
+    !isToolbarFocused &&
+    !isEditingBadges &&
+    files.size === 0;
+
   const baseClasses = useMemo(
     () =>
       cn(
@@ -277,10 +297,9 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
           !isSubmitting &&
           conversation?.messages?.length === 0
           ? 'transition-all duration-200 sm:mb-28'
-          : // 대화 중에는 Footer(Chat/Footer.tsx)가 이 아래 여백 안에 absolute 로
-            // 올라앉는다. BKL 푸터는 버전·태그라인·스펙트럼 띠 3층(≈54px)이라
-            // 업스트림 기본값 mb-10(40px)이면 입력창 밑변을 덮는다.
-            'sm:mb-16',
+          : // 대화 중에는 버전 푸터를 내리지 않는다(대기화면에만) — 면책 문구가
+            // 입력창 도구줄 안으로 들어갔으므로 아래 여백은 얇게.
+            'sm:mb-4',
       )}
     >
       <div className="relative flex h-full flex-1 items-stretch md:flex-col">
@@ -304,6 +323,8 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
           <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
           <div
             onClick={handleContainerClick}
+            onMouseEnter={() => setIsFormHovered(true)}
+            onMouseLeave={() => setIsFormHovered(false)}
             className={cn(
               'relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border pb-4 text-text-primary transition-all duration-200 sm:rounded-3xl sm:pb-0',
               isTextAreaFocused ? 'shadow-lg' : 'shadow-md',
@@ -379,26 +400,52 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
             )}
             <div
               className={cn(
-                '@container items-between flex gap-2 pb-2',
+                '@container items-between relative flex gap-2 pb-2',
                 isRTL ? 'flex-row-reverse' : 'flex-row',
               )}
+              onFocus={() => setIsToolbarFocused(true)}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                  setIsToolbarFocused(false);
+                }
+              }}
             >
               <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
                 <AttachFileChat conversation={conversation} disableInputs={disableInputs} />
               </div>
-              <BadgeRow
-                showEphemeralBadges={
-                  !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
-                }
-                isSubmitting={isSubmitting}
-                conversationId={conversationId}
-                specName={conversation?.spec}
-                onChange={setBadges}
-                isInChat={
-                  Array.isArray(conversation?.messages) && conversation.messages.length >= 1
-                }
-              />
+              <div
+                data-testid="bkl-toolbar-badges"
+                data-compact={isToolbarCompact ? 'true' : 'false'}
+                className={cn(
+                  'grid transition-[grid-template-columns,opacity] duration-200 ease-out',
+                  isToolbarCompact ? 'grid-cols-[0fr] opacity-0' : 'grid-cols-[1fr] opacity-100',
+                )}
+              >
+                <div className="min-w-0 overflow-hidden">
+                  <BadgeRow
+                    showEphemeralBadges={
+                      !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
+                    }
+                    isSubmitting={isSubmitting}
+                    conversationId={conversationId}
+                    specName={conversation?.spec}
+                    onChange={setBadges}
+                    isInChat={isInChat}
+                  />
+                </div>
+              </div>
               <div className="mx-auto flex" />
+              {isInChat && (
+                <span
+                  aria-hidden={!isToolbarCompact}
+                  className={cn(
+                    'pointer-events-none absolute inset-x-0 top-1/2 -translate-y-[calc(50%+4px)] select-none text-center text-[11px] leading-none text-text-secondary transition-opacity duration-200',
+                    isToolbarCompact ? 'opacity-100' : 'opacity-0',
+                  )}
+                >
+                  {BKL_AI_DISCLAIMER}
+                </span>
+              )}
               {SpeechToText && (
                 <AudioRecorder
                   methods={methods}

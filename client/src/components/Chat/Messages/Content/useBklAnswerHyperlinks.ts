@@ -72,12 +72,16 @@ const FILE_MENTION_RE = /『([^『』\n]+)』/g;
  * 링크 텍스트(파일명) 안에서 마크다운 인라인 문법으로 읽힐 수 있는 ASCII 문장부호.
  * 이메일 파일명은 `RE_ 제목 [BKL-M.FID…]_4733289.msg` 처럼 대괄호·밑줄을 품고
  * 있어 `[...]` 중첩, `_…_`/`*…*` 강조, `~…~` 취소선, 백틱이 링크 텍스트를
- * 쪼개거나 꾸밀 수 있다. 역슬래시 이스케이프는 렌더 결과에 글자 그대로 남는다.
+ * 쪼개거나 꾸밀 수 있다. 이스케이프는 렌더 결과에 글자 그대로 남는다.
+ *
+ * 역슬래시가 아니라 HTML 문자 참조(`&#91;` 등)로 쓴다 — `\[…\]` 는 LaTeX
+ * 디스플레이 수식 구분자라 운영 렌더에서 KaTeX 가 파일명 일부를 수식으로
+ * 그려 버렸다 (2026-11-03). 문자 참조는 마크다운 어디서도 문법이 되지 않는다.
  */
-const MD_LABEL_ESCAPE_RE = /([\\`*_~[\]<>])/g;
+const MD_LABEL_ESCAPE_RE = /[\\`*_~<>[\]]/g;
 
 function escapeMarkdownLabel(label: string): string {
-  return label.replace(MD_LABEL_ESCAPE_RE, '\\$1');
+  return label.replace(MD_LABEL_ESCAPE_RE, (ch) => `&#${ch.charCodeAt(0)};`);
 }
 /** 답변 저장 직후 매핑이 아직 PG 에 없을 수 있어 나눠 시도한다. */
 const FETCH_RETRY_DELAYS_MS = [0, 1500, 4000];
