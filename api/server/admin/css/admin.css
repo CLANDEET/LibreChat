@@ -459,3 +459,25 @@ button.src-modal-close.btn-refresh { font-size: 13px; color: #374151; }
 .cell-model code { white-space: nowrap; }
 .mono-small { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: #6b7280; word-break: break-all; min-width: 240px; }
 .cell-desc .user-email { max-width: 360px; white-space: normal; }
+
+/* ── 전역 로딩 오버레이 ───────────────────────────────────── */
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 900;
+  background: rgba(243, 244, 246, 0.62); backdrop-filter: blur(1.5px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity .15s ease;
+}
+.loading-overlay.show { opacity: 1; pointer-events: auto; cursor: progress; }
+.loading-card {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
+  padding: 22px 30px; min-width: 200px; box-shadow: 0 8px 30px rgba(0,0,0,.08);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.loading-spinner {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 3px solid #e5e7eb; border-top-color: #4f46e5;
+  animation: loading-spin .8s linear infinite;
+}
+.loading-text { font-size: 13px; color: #374151; font-weight: 500; }
+.loading-elapsed { font-size: 12px; color: #9ca3af; min-height: 14px; }
+@keyframes loading-spin { to { transform: rotate(360deg); } }

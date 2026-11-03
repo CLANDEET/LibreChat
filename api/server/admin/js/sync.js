@@ -99,7 +99,7 @@
   async function pollOnce() {
     if (!currentJobId) return;
     try {
-      const job = await A.getJSON('/sync/daily/' + encodeURIComponent(currentJobId));
+      const job = await A.getJSON('/sync/daily/' + encodeURIComponent(currentJobId), { silent: true });
       renderProgress(job);
       if (job.status === 'completed' || job.status === 'failed') {
         stopPolling();

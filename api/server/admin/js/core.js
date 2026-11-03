@@ -60,20 +60,90 @@
     }
   }
 
-  /* ── fetch ────────────────────────────────────────────────── */
-  async function getJSON(path) {
-    const r = await fetch(API + path, { headers: authHeaders() });
-    if (r.status === 401) {
-      showAuthGate('세션이 만료되었습니다. 토큰을 다시 입력하세요.');
-      throw new Error('unauthorized');
-    }
-    if (!r.ok) {
-      const body = await r.json().catch(() => ({}));
-      throw new Error(body.error || body.detail || path + ' → HTTP ' + r.status);
-    }
-    return r.json();
+  /* ── 전역 로딩 오버레이 ─────────────────────────────────────
+   * 어느 탭이든 데이터 요청이 진행 중이면 회색 배경 + 스피너를 띄운다.
+   * getJSON/sendJSON 이 자동으로 카운트하므로 탭 모듈은 신경 쓸 게 없다.
+   * - 250ms 안에 끝나는 요청은 깜빡임 방지를 위해 표시하지 않는다.
+   * - 백그라운드 폴링·자체 진행 표시가 있는 호출은 { silent: true } 로 제외.
+   * - 3초 넘게 걸리면 경과 시간을 같이 보여준다 (모델·과금 집계 등).
+   */
+  let pendingCount = 0;
+  let overlayTimer = null;
+  let tickTimer = null;
+  let loadingSince = 0;
+  function overlayEl() { return document.getElementById('loading-overlay'); }
+  function showOverlay() {
+    const el = overlayEl();
+    if (!el) return;
+    el.classList.add('show');
+    const txt = el.querySelector('.loading-elapsed');
+    const tick = () => {
+      const sec = Math.floor((Date.now() - loadingSince) / 1000);
+      if (txt) txt.textContent = sec >= 3 ? sec + '초 경과' : '';
+    };
+    tick();
+    if (!tickTimer) tickTimer = setInterval(tick, 1000);
   }
-  async function sendJSON(method, path, body) {
+  function hideOverlay() {
+    const el = overlayEl();
+    if (el) {
+      el.classList.remove('show');
+      const txt = el.querySelector('.loading-elapsed');
+      if (txt) txt.textContent = '';
+    }
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+  let hideTimer = null;
+  function beginLoading(opts) {
+    if (opts && opts.silent) return () => {};
+    if (pendingCount++ === 0) {
+      if (hideTimer) {
+        // 직전 요청이 막 끝나고 바로 다음 요청 — 연속 로딩으로 취급 (깜빡임·경과시간 리셋 방지)
+        clearTimeout(hideTimer); hideTimer = null;
+      } else {
+        loadingSince = Date.now();
+        overlayTimer = setTimeout(() => { overlayTimer = null; if (pendingCount > 0) showOverlay(); }, 250);
+      }
+    }
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      if (--pendingCount <= 0) {
+        pendingCount = 0;
+        if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
+        hideTimer = setTimeout(() => { hideTimer = null; if (pendingCount === 0) hideOverlay(); }, 200);
+      }
+    };
+  }
+
+  /* ── fetch ────────────────────────────────────────────────── */
+  async function getJSON(path, opts) {
+    const end = beginLoading(opts);
+    try {
+      const r = await fetch(API + path, { headers: authHeaders() });
+      if (r.status === 401) {
+        showAuthGate('세션이 만료되었습니다. 토큰을 다시 입력하세요.');
+        throw new Error('unauthorized');
+      }
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.error || body.detail || path + ' → HTTP ' + r.status);
+      }
+      return await r.json();
+    } finally {
+      end();
+    }
+  }
+  async function sendJSON(method, path, body, opts) {
+    const end = beginLoading(opts);
+    try {
+      return await sendJSONInner(method, path, body);
+    } finally {
+      end();
+    }
+  }
+  async function sendJSONInner(method, path, body) {
     const r = await fetch(API + path, {
       method,
       headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -628,6 +698,7 @@
     openSourceModal,
     createRangeFilter,
     makeChart,
+    beginLoading,
     reloadAll,
     switchTab,
     registerTab: (name, mod) => { tabs[name] = mod; },

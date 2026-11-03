@@ -713,6 +713,15 @@
   </main>
 </div>
 
+<!-- ── 전역 로딩 오버레이 (js/core.js beginLoading) ── -->
+<div class="loading-overlay" id="loading-overlay" aria-live="polite" aria-busy="true">
+  <div class="loading-card">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">데이터 불러오는 중…</div>
+    <div class="loading-elapsed"></div>
+  </div>
+</div>
+
 <!-- ── 데이터 삭제 확인 다이얼로그 ── -->
 <div class="auth-overlay" id="dd-overlay" style="display:none;">
   <div class="auth-card" style="width:520px; max-width:92vw; text-align:left;">
