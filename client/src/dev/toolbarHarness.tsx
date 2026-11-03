@@ -8,7 +8,7 @@
  * 사용: `npm run dev` 후 http://localhost:3090/toolbar-harness.html
  */
 import 'regenerator-runtime/runtime';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RecoilRoot } from 'recoil';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -24,6 +24,7 @@ import '../style.css';
 import BadgeRow from '~/components/Chat/Input/BadgeRow';
 import { CollapsibleToolbar, AiDisclaimer } from '~/components/Chat/Input/BklCompactToolbar';
 import { cn } from '~/utils';
+import useTextareaWidthResize from '~/hooks/Input/useTextareaWidthResize';
 
 function InputBox({
   isInChat,
@@ -36,6 +37,9 @@ function InputBox({
 }) {
   const [hovered, setHovered] = useState(false);
   const [toolbarFocused, setToolbarFocused] = useState(false);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  // ChatForm 과 동일: 폭이 바뀌면 높이 재계산 (좁을 때 잰 높이가 남지 않게)
+  useTextareaWidthResize(textAreaRef);
   // ChatForm: isToolbarCompact = isInChat && hoverCapable && !hovered && !focused ...
   const compact = forceCompact ?? (isInChat && !hovered && !toolbarFocused);
 
@@ -104,6 +108,7 @@ function InputBox({
           <div className="flex flex-row">
             <div className="relative flex-1">
               <TextareaAutosize
+                ref={textAreaRef}
                 rows={1}
                 aria-label="메시지 BKL Prism"
                 placeholder="메시지 BKL Prism"

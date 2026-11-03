@@ -18,11 +18,12 @@ import {
   useQueryParams,
   useSubmitMessage,
   useFocusChatEffect,
+  useTextareaWidthResize,
 } from '~/hooks';
 import { mainTextareaId, BadgeItem } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
-import { cn, removeFocusRings } from '~/utils';
+import { cn, forceResize, removeFocusRings } from '~/utils';
 import { CollapsibleToolbar, AiDisclaimer } from './BklCompactToolbar';
 import { parseBklQueryChoices } from '~/utils/bklFilter';
 import QueryChoicesPanel from '../Messages/Content/QueryChoicesPanel';
@@ -200,7 +201,14 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     }
     setVisualRowCount(1);
     setIsCollapsed(false);
+    // 대화 전환 직후 우측 패널이 열리며 레이아웃이 요동치는 동안 잰 높이가 남지
+    // 않도록, 레이아웃이 가라앉은 뒤 실제 scrollHeight 로 한 번 더 맞춘다.
+    const timer = window.setTimeout(() => forceResize(textAreaRef.current), 400);
+    return () => window.clearTimeout(timer);
   }, [conversationId, isSubmitting, methods]);
+
+  // 폭이 바뀔 때마다(패널 열림/리사이즈) 높이 재계산 — 상세는 훅 주석.
+  useTextareaWidthResize(textAreaRef, [endpoint]);
 
   const { ref, ...registerProps } = methods.register('text', {
     required: true,
