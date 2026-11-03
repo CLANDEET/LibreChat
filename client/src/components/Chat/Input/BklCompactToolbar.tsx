@@ -5,52 +5,45 @@ import { cn } from '~/utils';
 /**
  * 대화 중 입력창 도구줄 접기 (2026-11-03).
  *
- * 기본은 배지(필터·검색·쿼리 강화)를 접고 면책 문구 한 줄만 보여 읽기 영역을
- * 넓힌다. hover / 키보드 진입 / 파일 첨부 / 배지 편집이면 ChatForm 이 `compact`
- * 를 풀어 200ms 로 펼친다.
+ * 대화 중 입력창 박스는 기본적으로 **텍스트 한 줄 + 전송 버튼**만 보인다. 마우스를
+ * 올리면(hover) 박스 안 두 번째 줄(첨부·필터·검색·쿼리 강화·마이크)이 세로로
+ * 펼쳐져 대기화면과 같은 두 줄 박스가 된다. 키보드 진입(focus-within) / 파일 첨부 /
+ * 배지 편집 중에도 ChatForm 이 `compact` 를 풀어 펼친다. hover 가 없는 터치
+ * 기기에서는 항상 펼친 상태.
  *
- * 가로 접기는 grid `0fr → 1fr` 로 한다. 이때 안쪽은 반드시 `w-max` 여야 한다 —
- * 배지 줄이 flex-wrap 이라 폭이 0 으로 줄면 배지가 한 줄에 하나씩 세로로
- * 쌓여 입력창이 수직으로 늘어난다 (운영에서 겪음). 폭을 접을 수 없는 환경
- * (터치 기기·대기화면)에서는 `collapsible=false` 로 예전처럼 줄바꿈을 허용한다.
+ * 세로 접기는 grid `0fr → 1fr` 로 한다 (height:auto 는 transition 이 안 됨).
+ * 접힌 상태에서도 자식은 DOM 에 남아 Tab 으로 들어갈 수 있고, 그 focus 가 펼침
+ * 트리거가 된다.
  */
-export function CollapsibleBadges({
+export function CollapsibleToolbar({
   compact,
-  collapsible,
   children,
 }: {
   compact: boolean;
-  collapsible: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
-      data-testid="bkl-toolbar-badges"
+      data-testid="bkl-toolbar-collapsible"
       data-compact={compact ? 'true' : 'false'}
       className={cn(
-        'grid transition-[grid-template-columns,opacity] duration-200 ease-out',
-        compact ? 'grid-cols-[0fr] opacity-0' : 'grid-cols-[1fr] opacity-100',
+        'grid transition-[grid-template-rows,opacity] duration-200 ease-out',
+        compact ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100',
       )}
     >
-      <div className="min-w-0 overflow-hidden">
-        <div className={cn(collapsible && 'w-max')}>{children}</div>
-      </div>
+      <div className="min-h-0 overflow-hidden">{children}</div>
     </div>
   );
 }
 
-/** 접힌 도구줄 가운데 한 줄 — "Prism은 AI이므로 실수할 수 있습니다." */
-export function ToolbarDisclaimer({ visible }: { visible: boolean }) {
+/** 입력창 박스 **바깥** 아래 한 줄 — "Prism은 AI이므로 실수할 수 있습니다." */
+export function AiDisclaimer() {
   return (
-    <span
-      aria-hidden={!visible}
+    <div
       data-testid="bkl-toolbar-disclaimer"
-      className={cn(
-        'pointer-events-none absolute inset-x-0 top-1/2 -translate-y-[calc(50%+4px)] select-none text-center text-[11px] leading-none text-text-secondary transition-opacity duration-200',
-        visible ? 'opacity-100' : 'opacity-0',
-      )}
+      className="select-none pt-1.5 text-center text-[11px] leading-none text-text-secondary"
     >
       {BKL_AI_DISCLAIMER}
-    </span>
+    </div>
   );
 }

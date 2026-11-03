@@ -23,7 +23,7 @@ import { mainTextareaId, BadgeItem } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
 import { cn, removeFocusRings } from '~/utils';
-import { CollapsibleBadges, ToolbarDisclaimer } from './BklCompactToolbar';
+import { CollapsibleToolbar, AiDisclaimer } from './BklCompactToolbar';
 import { parseBklQueryChoices } from '~/utils/bklFilter';
 import QueryChoicesPanel from '../Messages/Content/QueryChoicesPanel';
 import BklMatterMention from './BklMatterMention';
@@ -242,20 +242,29 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
 
   const isMoreThanThreeRows = visualRowCount > 3;
 
-  const isInChat = Array.isArray(conversation?.messages) && conversation.messages.length >= 1;
-  // 대화 중에는 입력창 아래 도구줄(필터·검색·쿼리 강화)을 접어 두고 "Prism은 AI이므로…"
-  // 한 줄만 보여 읽기 영역을 넓힌다. 마우스를 올리거나(hover) 키보드로 도구줄에
-  // 들어오면(focus-within), 또는 파일 첨부·배지 편집 중이면 펼친다. hover 가 없는
-  // 터치 기기에서는 항상 펼친 상태.
+  // "대화 중" 은 라우트 기준으로 즉시 판정한다 (기존 대화 URL 이면 메시지가 아직
+  // 로딩 중이어도 true). 메시지 개수만 보면 사이드바에서 대화를 열 때 대기화면
+  // 레이아웃(큰 박스)이 먼저 그려졌다가 줄어드는 깜빡임이 생긴다. 새 대화에서 첫
+  // 메시지를 보낸 직후(아직 conversationId 가 'new')는 메시지 개수로 잡는다.
+  const isInChat =
+    conversationId !== Constants.NEW_CONVO ||
+    (Array.isArray(conversation?.messages) && conversation.messages.length >= 1);
+  // 대화 중 입력창 박스는 기본 **텍스트 한 줄 + 전송 버튼**. 마우스를 올리면(hover)
+  // 박스 안 두 번째 줄(첨부·필터·검색·쿼리 강화·마이크)이 펼쳐져 대기화면과 같은
+  // 두 줄이 된다. 키보드로 도구줄에 들어오거나(focus-within) 파일 첨부·배지 편집
+  // 중이면 펼친 채 유지. hover 가 없는 터치 기기에서는 항상 펼친 상태.
+  // "Prism은 AI이므로…" 면책 문구는 박스 **바깥** 아래 한 줄.
   const hoverCapable = useMemo(
     () => typeof window !== 'undefined' && !!window.matchMedia?.('(hover: hover)').matches,
     [],
   );
-  // 대화 중(hover 가능 기기)에는 입력창 박스를 텍스트 한 줄 + 전송 버튼만으로 두고,
-  // 첨부·배지·마이크 도구줄은 박스 **바깥 아래** 얇은 줄로 뺀다 (Claude 식).
-  const toolbarBelow = isInChat && hoverCapable;
   const isToolbarCompact =
-    toolbarBelow && !isFormHovered && !isToolbarFocused && !isEditingBadges && files.size === 0;
+    isInChat &&
+    hoverCapable &&
+    !isFormHovered &&
+    !isToolbarFocused &&
+    !isEditingBadges &&
+    files.size === 0;
 
   const baseClasses = useMemo(
     () =>
@@ -280,14 +289,13 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
       )
     );
 
-  // 첨부 · 배지(필터/검색/쿼리 강화) · 마이크 (· 전송) 도구줄. 대기화면에서는 박스 안
-  // 마지막 줄, 대화 중에는 박스 아래 얇은 줄(전송 버튼은 텍스트 줄로 이동).
+  // 첨부 · 배지(필터/검색/쿼리 강화) · 마이크 (· 전송) 도구줄 — 박스 안 마지막 줄.
+  // 대화 중에는 전송 버튼이 텍스트 줄로 올라가고, 이 줄은 hover 시에만 펼쳐진다.
   const toolbarRow = (
     <div
       className={cn(
-        '@container items-between relative flex items-center gap-2',
+        '@container items-between relative flex items-center gap-2 pb-2',
         isRTL ? 'flex-row-reverse' : 'flex-row',
-        toolbarBelow ? 'px-1 pt-1' : 'pb-2',
       )}
       data-testid="bkl-chat-toolbar"
       onFocus={() => setIsToolbarFocused(true)}
@@ -300,20 +308,17 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
       <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
         <AttachFileChat conversation={conversation} disableInputs={disableInputs} />
       </div>
-      <CollapsibleBadges compact={isToolbarCompact} collapsible={toolbarBelow}>
-        <BadgeRow
-          showEphemeralBadges={
-            !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
-          }
-          isSubmitting={isSubmitting}
-          conversationId={conversationId}
-          specName={conversation?.spec}
-          onChange={setBadges}
-          isInChat={isInChat}
-        />
-      </CollapsibleBadges>
+      <BadgeRow
+        showEphemeralBadges={
+          !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
+        }
+        isSubmitting={isSubmitting}
+        conversationId={conversationId}
+        specName={conversation?.spec}
+        onChange={setBadges}
+        isInChat={isInChat}
+      />
       <div className="mx-auto flex" />
-      {toolbarBelow && <ToolbarDisclaimer visible={isToolbarCompact} />}
       {SpeechToText && (
         <AudioRecorder
           methods={methods}
@@ -323,7 +328,7 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
           isSubmitting={isSubmitting}
         />
       )}
-      {!toolbarBelow && <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>{sendControl}</div>}
+      {!isInChat && <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>{sendControl}</div>}
     </div>
   );
 
@@ -361,11 +366,7 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
       )}
     >
       <div className="relative flex h-full flex-1 items-stretch md:flex-col">
-        <div
-          className="flex w-full flex-col"
-          onMouseEnter={() => setIsFormHovered(true)}
-          onMouseLeave={() => setIsFormHovered(false)}
-        >
+        <div className="flex w-full flex-col">
           <div className={cn('flex w-full items-center', isRTL && 'flex-row-reverse')}>
             {showPlusPopover && !isAssistantsEndpoint(endpoint) && (
               <Mention
@@ -386,6 +387,8 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
             <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
             <div
               onClick={handleContainerClick}
+              onMouseEnter={() => setIsFormHovered(true)}
+              onMouseLeave={() => setIsFormHovered(false)}
               className={cn(
                 'relative flex w-full flex-grow flex-col overflow-hidden rounded-t-3xl border pb-4 text-text-primary transition-all duration-200 sm:rounded-3xl sm:pb-0',
                 isTextAreaFocused ? 'shadow-lg' : 'shadow-md',
@@ -459,18 +462,22 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
                       setIsCollapsed={setIsCollapsed}
                     />
                   </div>
-                  {toolbarBelow && (
-                    <div className={cn('flex items-end pb-1', isRTL ? 'pl-2' : 'pr-2')}>
+                  {isInChat && (
+                    <div className={cn('flex items-end pb-2', isRTL ? 'pl-2' : 'pr-2')}>
                       {sendControl}
                     </div>
                   )}
                 </div>
               )}
-              {!toolbarBelow && toolbarRow}
+              {isInChat ? (
+                <CollapsibleToolbar compact={isToolbarCompact}>{toolbarRow}</CollapsibleToolbar>
+              ) : (
+                toolbarRow
+              )}
               {TextToSpeech && automaticPlayback && <StreamAudio index={index} />}
             </div>
           </div>
-          {toolbarBelow && toolbarRow}
+          {isInChat && <AiDisclaimer />}
         </div>
       </div>
     </form>

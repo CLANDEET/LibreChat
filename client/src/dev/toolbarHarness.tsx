@@ -22,7 +22,7 @@ import type { ChatFormValues } from '~/common';
 import '../locales/i18n';
 import '../style.css';
 import BadgeRow from '~/components/Chat/Input/BadgeRow';
-import { CollapsibleBadges, ToolbarDisclaimer } from '~/components/Chat/Input/BklCompactToolbar';
+import { CollapsibleToolbar, AiDisclaimer } from '~/components/Chat/Input/BklCompactToolbar';
 import { cn } from '~/utils';
 
 function InputBox({
@@ -36,9 +36,8 @@ function InputBox({
 }) {
   const [hovered, setHovered] = useState(false);
   const [toolbarFocused, setToolbarFocused] = useState(false);
-  // ChatForm: toolbarBelow = isInChat && hoverCapable
-  const toolbarBelow = isInChat;
-  const compact = forceCompact ?? (toolbarBelow && !hovered && !toolbarFocused);
+  // ChatForm: isToolbarCompact = isInChat && hoverCapable && !hovered && !focused ...
+  const compact = forceCompact ?? (isInChat && !hovered && !toolbarFocused);
 
   const sendControl = (
     <button
@@ -52,10 +51,7 @@ function InputBox({
 
   const toolbarRow = (
     <div
-      className={cn(
-        '@container items-between relative flex flex-row items-center gap-2',
-        toolbarBelow ? 'px-1 pt-1' : 'pb-2',
-      )}
+      className={cn('@container items-between relative flex flex-row items-center gap-2 pb-2')}
       onFocus={() => setToolbarFocused(true)}
       onBlur={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
@@ -71,25 +67,22 @@ function InputBox({
           <Paperclip className="h-5 w-5" />
         </button>
       </div>
-      <CollapsibleBadges compact={compact} collapsible={toolbarBelow}>
-        <BadgeRow
-          showEphemeralBadges
-          isSubmitting={false}
-          conversationId={isInChat ? 'c1' : 'new'}
-          specName={undefined}
-          onChange={() => undefined}
-          isInChat={isInChat}
-        />
-      </CollapsibleBadges>
+      <BadgeRow
+        showEphemeralBadges
+        isSubmitting={false}
+        conversationId={isInChat ? 'c1' : 'new'}
+        specName={undefined}
+        onChange={() => undefined}
+        isInChat={isInChat}
+      />
       <div className="mx-auto flex" />
-      {toolbarBelow && <ToolbarDisclaimer visible={compact} />}
       <button
         type="button"
         className="flex size-9 items-center justify-center rounded-full p-1 hover:bg-surface-hover"
       >
         <Mic className="h-5 w-5" />
       </button>
-      {!toolbarBelow && <div className="mr-2">{sendControl}</div>}
+      {!isInChat && <div className="mr-2">{sendControl}</div>}
     </div>
   );
 
@@ -99,13 +92,11 @@ function InputBox({
       style={{ width }}
       data-testid={`box-${isInChat ? 'chat' : 'landing'}`}
     >
-      <div
-        className="flex w-full flex-col"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
+      <div className="flex w-full flex-col">
         <div
           data-testid="box"
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
           className={cn(
             'relative flex w-full flex-grow flex-col overflow-hidden rounded-3xl border border-border-light bg-surface-chat text-text-primary shadow-md transition-all duration-200',
           )}
@@ -121,11 +112,15 @@ function InputBox({
                 style={{ height: 44, overflowY: 'auto' }}
               />
             </div>
-            {toolbarBelow && <div className="flex items-end pb-1 pr-2">{sendControl}</div>}
+            {isInChat && <div className="flex items-end pb-2 pr-2">{sendControl}</div>}
           </div>
-          {!toolbarBelow && toolbarRow}
+          {isInChat ? (
+            <CollapsibleToolbar compact={compact}>{toolbarRow}</CollapsibleToolbar>
+          ) : (
+            toolbarRow
+          )}
         </div>
-        {toolbarBelow && toolbarRow}
+        {isInChat && <AiDisclaimer />}
       </div>
       <p className="mt-1 text-center font-mono text-[10px] text-text-secondary">
         {isInChat ? 'chat' : 'landing'} · compact={String(compact)} · hovered={String(hovered)}
