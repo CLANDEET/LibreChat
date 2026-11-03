@@ -6,7 +6,7 @@
  * 매터가 없으므로 그 범위에서는 비활성이고 선택도 비워진다.
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { BklMatter } from '~/data-provider/Matters/queries';
 
 const mockMatters: BklMatter[] = [
@@ -63,6 +63,17 @@ describe('FilterBar 매터 선택', () => {
       expect.objectContaining({
         matters: [{ matter_uid: '1002', label: '2023가단200', sub: '한강건설' }],
       }),
+    );
+  });
+
+  it('매터를 고르면 팝오버가 닫힌다', async () => {
+    renderBar();
+    openMatterMenu();
+    fireEvent.click(screen.getByText('한강 PF'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '매터 선택' }).getAttribute('aria-expanded')).toBe(
+        'false',
+      ),
     );
   });
 

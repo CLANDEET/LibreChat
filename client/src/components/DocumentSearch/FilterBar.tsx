@@ -195,6 +195,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
       if (selectedMatters.some((p) => p.matter_uid === item.matter_uid)) return;
       onChange({ ...value, matters: [...selectedMatters, item] });
       setMatterSearch('');
+      setMatterOpen(false); // 선택 1회 → 닫힘 (기간 프리셋과 동일)
     },
     [onChange, selectedMatters, value],
   );
