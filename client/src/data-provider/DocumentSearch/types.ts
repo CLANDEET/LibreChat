@@ -12,6 +12,8 @@ export interface KeywordSearchFilters {
   extension_groups?: string[];
   workspace_class?: string;
   matter_uid?: string;
+  /** 매터(사건) 범위 — OpenSearch terms: matter_uid. 비어 있으면 전체. */
+  matter_uids?: string[];
   /** iManage 라이브러리 범위: "matter"(사건 문서, M) | "knowledge"(지식 DB). 생략 시 전체. */
   library?: 'matter' | 'knowledge';
 }

@@ -1,11 +1,17 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { ko, enUS } from 'date-fns/locale';
 import { format, parseISO } from 'date-fns';
 import { DayPicker } from 'react-day-picker';
-import { CalendarDays, Check, ChevronDown, RotateCcw } from 'lucide-react';
+import { Briefcase, CalendarDays, Check, ChevronDown, RotateCcw, X } from 'lucide-react';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
+import type { BklMatterSelection } from '~/store/bkl';
+import {
+  filterMatters as fuzzyFilterMatters,
+  useBklMattersQuery,
+} from '~/data-provider/Matters/queries';
+import type { BklMatter } from '~/data-provider/Matters/queries';
 
 export type ExtensionGroup = 'pdf' | 'msg' | 'docx' | 'hwpx' | 'pptx' | 'other';
 // iManage 라이브러리: matter = 사건 문서(M), knowledge = 지식 DB(DB)
@@ -27,6 +33,8 @@ export interface DocumentSearchFilterState {
   endDate: string | null;
   extensionGroups: ExtensionGroup[];
   library: LibraryFilter;
+  /** 매터(사건) 범위 — 채팅 필터와 같은 선택 모델. 비어 있으면 전체. */
+  matters: BklMatterSelection[];
 }
 
 export const EMPTY_DOC_FILTERS: DocumentSearchFilterState = {
@@ -35,6 +43,11 @@ export const EMPTY_DOC_FILTERS: DocumentSearchFilterState = {
   endDate: null,
   extensionGroups: [],
   library: 'all',
+  matters: [],
+};
+
+const stopMenuInputEvent = (event: React.SyntheticEvent<HTMLInputElement>) => {
+  event.stopPropagation();
 };
 
 const EXTENSION_OPTIONS: {
@@ -55,6 +68,21 @@ const LIBRARY_OPTIONS: { id: LibraryFilter; label: string }[] = [
   { id: 'matter', label: 'M 라이브러리' },
   { id: 'knowledge', label: 'DB 라이브러리' },
 ];
+
+// 매터 선택기 문구 (다른 라벨들처럼 한국어 고정)
+const MATTER_UI = {
+  prefix: '매터:',
+  all: '전체',
+  loading: '불러오는 중…',
+  noMatch: '일치하는 사건이 없습니다',
+  empty: '접근 가능한 사건이 없습니다',
+};
+
+function matterButtonLabel(selected: BklMatterSelection[]): string {
+  if (selected.length === 0) return MATTER_UI.all;
+  if (selected.length === 1) return selected[0].label;
+  return `${selected[0].label} 외 ${selected.length - 1}`;
+}
 
 const PRESET_OPTIONS: { preset: Exclude<PeriodPreset, 'custom'>; labelKey: string }[] = [
   { preset: 'all', labelKey: 'com_ui_period_all' },
@@ -117,7 +145,8 @@ export function isFilterActive(state: DocumentSearchFilterState): boolean {
     state.startDate !== null ||
     state.endDate !== null ||
     state.extensionGroups.length > 0 ||
-    (state.library ?? 'all') !== 'all'
+    (state.library ?? 'all') !== 'all' ||
+    (state.matters ?? []).length > 0
   );
 }
 
@@ -133,6 +162,48 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
   const [activeField, setActiveField] = useState<'start' | 'end' | null>(null);
 
   const menu = Ariakit.useMenuStore({ open: periodOpen, setOpen: setPeriodOpen });
+
+  // 매터 선택 — 내 사건 목록(/bkl/matters, ACL 적용됨)에서 번호/별칭/의뢰인으로 걸러 고른다.
+  const [matterOpen, setMatterOpen] = useState(false);
+  const [matterSearch, setMatterSearch] = useState('');
+  const matterMenu = Ariakit.useMenuStore({ open: matterOpen, setOpen: setMatterOpen });
+  const selectedMatters = useMemo(() => value.matters ?? [], [value.matters]);
+  const matterDisabled = value.library === 'knowledge'; // 지식DB 문서엔 매터가 없다
+  useEffect(() => {
+    if (matterDisabled) {
+      setMatterOpen(false);
+      setMatterSearch('');
+    }
+  }, [matterDisabled]);
+  const { data: mattersData, isLoading: mattersLoading } = useBklMattersQuery(
+    matterOpen && !matterDisabled,
+  );
+  const matterCandidates: BklMatter[] = useMemo(() => {
+    if (!mattersData) return [];
+    const exclude = new Set(selectedMatters.map((m) => m.matter_uid));
+    return fuzzyFilterMatters(mattersData.matters, matterSearch, 12).filter(
+      (m) => !exclude.has(m.matter_uid),
+    );
+  }, [mattersData, matterSearch, selectedMatters]);
+  const addMatter = useCallback(
+    (m: BklMatter) => {
+      const item: BklMatterSelection = {
+        matter_uid: m.matter_uid,
+        label: m.case_number || m.matter_uid,
+        sub: m.client || m.case_alias || undefined,
+      };
+      if (selectedMatters.some((p) => p.matter_uid === item.matter_uid)) return;
+      onChange({ ...value, matters: [...selectedMatters, item] });
+      setMatterSearch('');
+      setMatterOpen(false); // 선택 1회 → 닫힘 (기간 프리셋과 동일)
+    },
+    [onChange, selectedMatters, value],
+  );
+  const removeMatter = useCallback(
+    (uid: string) =>
+      onChange({ ...value, matters: selectedMatters.filter((m) => m.matter_uid !== uid) }),
+    [onChange, selectedMatters, value],
+  );
 
   const dpLocale = useMemo(() => {
     if (typeof navigator !== 'undefined') {
@@ -207,6 +278,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
     onChange(EMPTY_DOC_FILTERS);
     setActiveField(null);
     setPeriodOpen(false);
+    setMatterOpen(false);
+    setMatterSearch('');
   }, [onChange]);
 
   const activeSelected = activeField === 'start' ? startDate : endDate;
@@ -326,7 +399,14 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
               type="button"
               role="radio"
               aria-checked={selected}
-              onClick={() => onChange({ ...value, library: opt.id })}
+              onClick={() =>
+                onChange({
+                  ...value,
+                  library: opt.id,
+                  // 지식DB 범위에는 매터가 없으므로 선택을 비운다
+                  matters: opt.id === 'knowledge' ? [] : (value.matters ?? []),
+                })
+              }
               className={cn(
                 'inline-flex h-7 items-center rounded-full px-3 text-xs font-medium transition-colors',
                 selected
@@ -339,6 +419,84 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
           );
         })}
       </div>
+
+      {/* 매터 (사건) */}
+      <Ariakit.MenuProvider store={matterMenu}>
+        <Ariakit.MenuButton
+          disabled={matterDisabled}
+          className={cn(
+            'inline-flex h-9 items-center gap-2 rounded-full border border-border-medium bg-surface-primary px-3.5 text-sm text-text-primary transition-colors hover:border-border-heavy',
+            (matterOpen || selectedMatters.length > 0) && 'border-text-primary',
+            matterDisabled && 'cursor-not-allowed opacity-50',
+          )}
+          aria-label="매터 선택"
+          title={matterDisabled ? 'DB 라이브러리에는 매터가 없습니다' : undefined}
+        >
+          <Briefcase className="h-4 w-4 text-text-secondary" aria-hidden="true" />
+          <span className="text-text-secondary">{MATTER_UI.prefix}</span>
+          <span className="font-medium">{matterButtonLabel(selectedMatters)}</span>
+          <ChevronDown className="h-3.5 w-3.5 text-text-secondary" aria-hidden="true" />
+        </Ariakit.MenuButton>
+        <Ariakit.Menu
+          portal
+          unmountOnHide
+          gutter={6}
+          className="popover-ui z-50 w-[340px] !overflow-visible !p-2"
+        >
+          {selectedMatters.length > 0 && (
+            <div className="mb-1.5 flex flex-wrap gap-1 px-1">
+              {selectedMatters.map((m) => (
+                <button
+                  key={m.matter_uid}
+                  type="button"
+                  onClick={() => removeMatter(m.matter_uid)}
+                  aria-label={`${m.label} 매터 제거`}
+                  className="inline-flex max-w-full items-center gap-1 rounded-full border border-border-medium px-2 py-1 text-xs text-text-secondary hover:text-text-primary"
+                >
+                  <Briefcase className="h-3 w-3" aria-hidden="true" />
+                  <span className="truncate">{m.label}</span>
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            value={matterSearch}
+            onChange={(e) => setMatterSearch(e.target.value)}
+            placeholder="사건명/사건번호 검색"
+            aria-label="매터 검색"
+            className="w-full rounded-md border border-border-light bg-surface-primary px-2 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none"
+            onKeyDown={(e) => e.stopPropagation()}
+            onBeforeInput={stopMenuInputEvent}
+            onPointerDown={stopMenuInputEvent}
+            onMouseDown={stopMenuInputEvent}
+            onClick={stopMenuInputEvent}
+          />
+          <div className="mt-1 max-h-64 overflow-y-auto rounded-md border border-border-light">
+            {mattersLoading && (
+              <div className="px-2 py-2 text-xs text-text-tertiary">{MATTER_UI.loading}</div>
+            )}
+            {!mattersLoading && matterCandidates.length === 0 && (
+              <div className="px-2 py-2 text-xs text-text-tertiary">
+                {matterSearch.trim() ? MATTER_UI.noMatch : MATTER_UI.empty}
+              </div>
+            )}
+            {matterCandidates.map((m) => (
+              <Ariakit.MenuItem
+                key={m.matter_uid}
+                hideOnClick={false}
+                onClick={() => addMatter(m)}
+                className="block w-full cursor-pointer px-2 py-1.5 text-left text-xs outline-none hover:bg-surface-hover focus:bg-surface-hover"
+              >
+                <div className="truncate font-medium text-text-primary">
+                  {m.case_alias || m.case_number || m.matter_uid}
+                </div>
+                <div className="truncate text-text-tertiary">{m.client || m.case_name}</div>
+              </Ariakit.MenuItem>
+            ))}
+          </div>
+        </Ariakit.Menu>
+      </Ariakit.MenuProvider>
 
       {/* 확장자 */}
       <div className="flex flex-wrap items-center gap-1.5">
