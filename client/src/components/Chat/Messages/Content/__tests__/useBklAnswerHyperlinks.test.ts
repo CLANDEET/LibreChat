@@ -67,8 +67,9 @@ describe('표시명 정제 (FILENAME_DISPLAY_FIX_SPEC)', () => {
       },
     });
     const resolver = resolverFromMaps(maps!.byName, maps!.byDocId, null, maps!.displayNames);
+    // 링크 텍스트의 `_` 는 마크다운 강조로 읽히지 않게 이스케이프된다 (렌더는 글자 그대로)
     expect(applyBklAnswerHyperlinks(`근거: 『${RAW}』`, resolver)).toBe(
-      `근거: [『RE_ SPC 담보.msg』](<${URL_A}>)`,
+      `근거: [『RE\\_ SPC 담보.msg』](<${URL_A}>)`,
     );
   });
 
@@ -78,7 +79,7 @@ describe('표시명 정제 (FILENAME_DISPLAY_FIX_SPEC)', () => {
     });
     const resolver = resolverFromMaps(null, null, null, maps!.displayNames);
     expect(applyBklAnswerHyperlinks(`[『${RAW}』](${URL_B})`, resolver)).toBe(
-      `[『RE_ SPC 담보.msg』](${URL_B})`,
+      `[『RE\\_ SPC 담보.msg』](${URL_B})`,
     );
   });
 
@@ -91,6 +92,18 @@ describe('표시명 정제 (FILENAME_DISPLAY_FIX_SPEC)', () => {
     ]);
     const resolver = resolverFromMaps(null, null, idx);
     expect(applyBklAnswerHyperlinks(`『${RAW}』`, resolver)).toBe('『RE_ SPC 담보.msg』');
+  });
+
+  it('keeps the server URL for names containing "]" and escapes markdown-active characters', () => {
+    const NAME = 'RE_ SPC 대주단 담보 제공 관련 [BKL-M.FID2086960]_4733289.msg';
+    const maps = parseHyperlinksResponse({
+      mapping: { [`『${NAME}』`]: `[『${NAME}』](${URL_A})` },
+    });
+    expect(maps?.byName.get(normalizeFileKey(NAME))).toBe(URL_A);
+    const resolver = resolverFromMaps(maps!.byName);
+    expect(applyBklAnswerHyperlinks(`| 1 | 『${NAME}』 | ○ |`, resolver)).toBe(
+      `| 1 | [『RE\\_ SPC 대주단 담보 제공 관련 \\[BKL-M.FID2086960\\].msg』](<${URL_A}>) | ○ |`,
+    );
   });
 
   it('strips only the OCR .md when nothing else is known', () => {
