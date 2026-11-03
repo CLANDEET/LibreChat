@@ -1,5 +1,11 @@
 /** FILENAME_DISPLAY_FIX_SPEC — 표시용 파일명 정제 (클라이언트 폴백 규칙). */
-import { displayFileName, displayNameFromMeta, displayNameOf } from '../displayName';
+import {
+  displayFileName,
+  displayNameFromMeta,
+  displayNameOf,
+  docnumFromImanageId,
+  documentNumberFromMeta,
+} from '../displayName';
 
 describe('displayFileName', () => {
   it.each([
@@ -57,5 +63,58 @@ describe('displayNameOf', () => {
     expect(displayNameOf({ display_name: 'X.pdf', file_name: 'X_9.pdf.md' })).toBe('X.pdf');
     expect(displayNameOf({ file_name: 'X_9.pdf.md', imanage_document_number: 9 })).toBe('X.pdf');
     expect(displayNameOf({ file_name: 'X_9.pdf.md' })).toBe('X_9.pdf');
+  });
+});
+
+describe('fallbacks when document_number is unknown', () => {
+  it.each([
+    ['Mn733289.1', '733289'],
+    ['KR!9319684.3', '9319684'],
+    ['https://km.bkl.co.kr/work/link/d/Mn733289.1', '733289'],
+    ['https://km.bkl.co.kr/work/link/d/Mn733289.1?x=1', '733289'],
+    ['abc', null],
+    ['', null],
+    [undefined, null],
+  ])('docnumFromImanageId(%s) → %s', (value, expected) => {
+    expect(docnumFromImanageId(value)).toBe(expected);
+  });
+
+  it('documentNumberFromMeta prefers explicit number, then id, then url', () => {
+    expect(documentNumberFromMeta({ imanage_document_number: 12, imanage_doc_id: 'Mn99.1' })).toBe(
+      '12',
+    );
+    expect(documentNumberFromMeta({ imanage_doc_id: 'Mn99.1' })).toBe('99');
+    expect(
+      documentNumberFromMeta({ imanage_preview_url: 'https://km.bkl.co.kr/work/link/d/Mn5.1' }),
+    ).toBe('5');
+    expect(documentNumberFromMeta({})).toBeNull();
+  });
+
+  it.each([
+    ['계약서_9319684.pdf', '계약서.pdf'],
+    ['0102 이사회규정(20140225)_12964400.docx.md', '0102 이사회규정(20140225).docx'],
+    ['계약서_20251103.pdf', '계약서_20251103.pdf'], // YYYYMMDD 보존
+    ['계약서_250311.pdf.md', '계약서_250311.pdf'], // 6자리 보존
+    ['갑 제1호증_12.pdf', '갑 제1호증_12.pdf'],
+    ['a_123456789.pdf', 'a_123456789.pdf'],
+    ['9319684_계약서.pdf', '9319684_계약서.pdf'],
+  ])('heuristic %s → %s', (name, expected) => {
+    expect(displayFileName(name, null)).toBe(expected);
+  });
+
+  it('does not apply the heuristic when a mismatching number is known or when disabled', () => {
+    expect(displayFileName('계약서_1234567.pdf', '9999999')).toBe('계약서_1234567.pdf');
+    expect(displayFileName('계약서_9319684.pdf', null, { heuristic: false })).toBe(
+      '계약서_9319684.pdf',
+    );
+  });
+
+  it('displayNameFromMeta derives the number from the iManage url', () => {
+    expect(
+      displayNameFromMeta({
+        name: '『메일_4733289.msg.md』- [3]',
+        imanage_url: 'https://km.bkl.co.kr/work/link/d/Mn4733289.1',
+      }),
+    ).toBe('메일.msg');
   });
 });

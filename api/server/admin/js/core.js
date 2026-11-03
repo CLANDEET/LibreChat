@@ -210,7 +210,13 @@
     if (meta.display_name) return String(meta.display_name);
     const raw = String(meta.name ?? meta.file_name ?? src?.source?.name ?? '').normalize('NFC');
     const m = raw.match(/^『(.+?)』/);
-    return displayFileName(m ? m[1] : raw, meta.imanage_document_number);
+    return displayFileName({
+      file_name: m ? m[1] : raw,
+      imanage_document_number: meta.imanage_document_number,
+      imanage_doc_id: meta.imanage_doc_id,
+      imanage_url: meta.imanage_url ?? src?.source?.imanage_url,
+      imanage_preview_url: meta.imanage_preview_url ?? src?.source?.imanage_preview_url,
+    });
   }
   function sourceRawName(src) {
     const meta = sourceMeta(src);
@@ -365,12 +371,25 @@
    * 걷어낸다. document_number 와 정확히 일치하는 끝 숫자만 지운다.
    * 객체를 넘기면 `display_name` → `file_name`+`imanage_document_number` 순으로 본다.
    */
+  /** iManage 문서 id("Mn733289.1") 또는 링크 URL 에서 번호만. */
+  function docnumFromImanageId(v) {
+    if (typeof v !== 'string' || !v.trim()) return null;
+    let s = v.trim().replace(/\/+$/, '');
+    if (s.includes('/')) s = s.slice(s.lastIndexOf('/') + 1);
+    s = s.split('?')[0];
+    const m = s.match(/(\d+)(?:\.\d+)?$/);
+    return m ? m[1] : null;
+  }
   function displayFileName(fileNameOrDoc, documentNumber) {
     let name = fileNameOrDoc;
     if (fileNameOrDoc && typeof fileNameOrDoc === 'object') {
-      if (fileNameOrDoc.display_name) return String(fileNameOrDoc.display_name);
-      name = fileNameOrDoc.file_name;
-      documentNumber = fileNameOrDoc.imanage_document_number;
+      const d = fileNameOrDoc;
+      if (d.display_name) return String(d.display_name);
+      name = d.file_name;
+      documentNumber = d.imanage_document_number
+        ?? docnumFromImanageId(d.imanage_doc_id)
+        ?? docnumFromImanageId(d.imanage_url)
+        ?? docnumFromImanageId(d.imanage_preview_url);
     }
     if (!name) return '';
     name = String(name);
@@ -378,6 +397,12 @@
       const num = String(documentNumber).trim();
       if (/^\d+$/.test(num)) {
         name = name.replace(new RegExp('_' + num + '(?=(?:\\.[^.\\s]+)*$)'), '');
+      }
+    } else {
+      // 번호를 모를 때의 보수적 폴백 — 확장자 앞 _{7~8자리}, YYYYMMDD 날짜는 보존 (display.py 와 동일)
+      const m = /_(\d{7,8})(?=(?:\.[^.\s]+)*$)/.exec(name);
+      if (m && !/^(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])$/.test(m[1])) {
+        name = name.slice(0, m.index) + name.slice(m.index + m[0].length);
       }
     }
     return name.replace(/\.(?:md|markdown)$/i, '');
