@@ -208,8 +208,10 @@
     sel.innerHTML = '<option value="">전체 모델</option>' +
       j.rows.map((m) => `<option value="${A.escHtml(m.model)}">${A.escHtml(m.model)}${m.priced ? '' : ' (단가 없음)'}</option>`).join('');
     if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+    // 단가 폼 datalist: 호출 이력 모델 + 현재 설정된 활성 모델 (아직 호출 없어도)
+    const names = [...new Set([...j.rows.map((m) => m.model), ...(A.backendModels?.activeModelNames() || [])])];
     document.getElementById('llm-model-list').innerHTML =
-      j.rows.map((m) => `<option value="${A.escHtml(m.model)}"></option>`).join('');
+      names.map((m) => `<option value="${A.escHtml(m)}"></option>`).join('');
     modelOptionsLoaded = true;
   }
 
@@ -218,6 +220,14 @@
     const el = document.getElementById('llm-p-msg');
     el.textContent = text || '';
     el.classList.toggle('err', !!isErr);
+  }
+
+  async function loadActive() {
+    if (!A.backendModels) return;
+    await A.backendModels.renderReadonly((model) => {
+      prefillPriceForm(model);
+      document.getElementById('llm-price-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 
   /** 모델명을 채우고, 단가가 아직 없는 모델이면 시작일을 첫 사용일로 당겨 과거분까지 과금되게 한다. */
@@ -237,7 +247,7 @@
       fromEl.value = unpriced && info.first_seen ? info.first_seen.slice(0, 10) : A.toYMD(new Date());
       setPriceMsg(unpriced
         ? `${model} 은 단가가 없어 첫 사용일(${fromEl.value})부터 소급 적용되도록 시작일을 채웠습니다.`
-        : '');
+        : !info && model ? `${model} 은 아직 호출 이력이 없습니다. 오늘부터 적용되는 단가를 미리 등록합니다.` : '');
     }
     document.getElementById('llm-p-model').focus();
   }
@@ -273,7 +283,7 @@
         if (!confirm(`${row.model} · ${row.effective_from} 단가를 삭제할까요?\n이 행에 의존하던 호출은 이전 단가 또는 '단가 없음'으로 재계산됩니다.`)) return;
         try {
           await A.sendJSON('DELETE', '/llm-usage/prices/' + row.id);
-          await Promise.all([loadPrices(), loadModels(), loadSummary(), loadDaily()]);
+          await Promise.all([loadPrices(), loadModels(), loadSummary(), loadDaily(), loadActive()]);
         } catch (e) {
           setPriceMsg('삭제 실패: ' + e.message, true);
         }
@@ -304,7 +314,7 @@
       });
       setPriceMsg(`저장됨 · ${model} (${from || '오늘'}부터 적용). 비용을 다시 집계했습니다.`);
       ['llm-p-in', 'llm-p-out', 'llm-p-cached', 'llm-p-note'].forEach((id) => { document.getElementById(id).value = ''; });
-      await Promise.all([loadPrices(), loadModels(), loadSummary(), loadDaily(), loadUsers()]);
+      await Promise.all([loadPrices(), loadModels(), loadSummary(), loadDaily(), loadUsers(), loadActive()]);
     } catch (e) {
       setPriceMsg('저장 실패: ' + e.message, true);
     } finally {
@@ -383,6 +393,7 @@
 
   /* ── 탭 load ───────────────────────────────────────────────── */
   async function load() {
+    await loadActive().catch(console.error);
     if (!modelOptionsLoaded) await loadModels();
     await Promise.all([loadSummary(), loadDaily(), loadUsers(), loadPrices(), loadRecent(), loadModels()]);
     document.getElementById('llm-sub').textContent =
