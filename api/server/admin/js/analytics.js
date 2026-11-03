@@ -164,7 +164,7 @@
     btn.disabled = true;
     body.textContent = 'AI 요약 생성 중... (수십 초 걸릴 수 있습니다)';
     try {
-      const j = await A.getJSON('/analytics/ai-summary' + range.params(regenerate ? 'regenerate=true' : ''));
+      const j = await A.getJSON('/analytics/ai-summary' + range.params(regenerate ? 'regenerate=true' : ''), { silent: true });
       // LLM 이 마크다운으로 요약을 생성 — 원문 노출 대신 렌더링 (escHtml 선행).
       body.innerHTML = A.renderMarkdown(j.summary);
       btn.textContent = '재생성';
