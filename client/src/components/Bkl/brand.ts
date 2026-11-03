@@ -20,3 +20,9 @@ export const BKL_TAGLINE = '흩어진 지식을 하나의 스펙트럼으로';
  * 용도로 남는다.
  */
 export const BKL_APP_TITLE = 'BKL Prism';
+
+/**
+ * 대화 중 입력창 아래 한 줄로 두는 면책 문구. 대기화면의 버전·태그라인 푸터는
+ * 대화에 들어오면 사라지고 이 문구가 그 자리를 대신한다.
+ */
+export const BKL_AI_DISCLAIMER = 'Prism은 AI이므로 실수할 수 있습니다.';

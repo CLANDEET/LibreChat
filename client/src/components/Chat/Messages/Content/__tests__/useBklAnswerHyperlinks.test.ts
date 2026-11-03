@@ -67,9 +67,9 @@ describe('표시명 정제 (FILENAME_DISPLAY_FIX_SPEC)', () => {
       },
     });
     const resolver = resolverFromMaps(maps!.byName, maps!.byDocId, null, maps!.displayNames);
-    // 링크 텍스트의 `_` 는 마크다운 강조로 읽히지 않게 이스케이프된다 (렌더는 글자 그대로)
+    // 링크 텍스트의 `_` 는 마크다운 강조로 읽히지 않게 문자 참조로 바뀐다 (렌더는 글자 그대로)
     expect(applyBklAnswerHyperlinks(`근거: 『${RAW}』`, resolver)).toBe(
-      `근거: [『RE\\_ SPC 담보.msg』](<${URL_A}>)`,
+      `근거: [『RE&#95; SPC 담보.msg』](<${URL_A}>)`,
     );
   });
 
@@ -79,7 +79,7 @@ describe('표시명 정제 (FILENAME_DISPLAY_FIX_SPEC)', () => {
     });
     const resolver = resolverFromMaps(null, null, null, maps!.displayNames);
     expect(applyBklAnswerHyperlinks(`[『${RAW}』](${URL_B})`, resolver)).toBe(
-      `[『RE\\_ SPC 담보.msg』](${URL_B})`,
+      `[『RE&#95; SPC 담보.msg』](${URL_B})`,
     );
   });
 
@@ -102,7 +102,7 @@ describe('표시명 정제 (FILENAME_DISPLAY_FIX_SPEC)', () => {
     expect(maps?.byName.get(normalizeFileKey(NAME))).toBe(URL_A);
     const resolver = resolverFromMaps(maps!.byName);
     expect(applyBklAnswerHyperlinks(`| 1 | 『${NAME}』 | ○ |`, resolver)).toBe(
-      `| 1 | [『RE\\_ SPC 대주단 담보 제공 관련 \\[BKL-M.FID2086960\\].msg』](<${URL_A}>) | ○ |`,
+      `| 1 | [『RE&#95; SPC 대주단 담보 제공 관련 &#91;BKL-M.FID2086960&#93;.msg』](<${URL_A}>) | ○ |`,
     );
   });
 
