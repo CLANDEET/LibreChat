@@ -202,6 +202,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
         endDate: null,
       }));
       setActiveField(null);
+      setIsOpen(false);
     },
     [setPeriodFilter],
   );
@@ -222,13 +223,17 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
         return { ...prev, preset: 'custom', startDate: nextStart, endDate: value };
       });
       setActiveField(null);
+      // 시작·끝이 다 정해졌을 때만 닫는다 — 한쪽만 고른 상태에서 닫히면 되돌아와야 한다.
+      const other = field === 'start' ? periodFilter.endDate : periodFilter.startDate;
+      if (value && other) setIsOpen(false);
     },
-    [setPeriodFilter],
+    [periodFilter.endDate, periodFilter.startDate, setPeriodFilter],
   );
 
   const handleSelectLibrary = useCallback(
     (id: LibraryFilter) => {
       setPeriodFilter((prev) => ({ ...prev, library: id }));
+      setIsOpen(false);
     },
     [setPeriodFilter],
   );
@@ -241,6 +246,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
         else set.add(id);
         return { ...prev, extensionGroups: Array.from(set) };
       });
+      setIsOpen(false);
     },
     [setPeriodFilter],
   );
@@ -337,6 +343,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
         prev.some((p) => p.matter_uid === item.matter_uid) ? prev : [...prev, item],
       );
       setMatterSearch('');
+      setIsOpen(false);
     },
     [setFilterMatters],
   );
@@ -346,6 +353,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
       if (!q) return;
       setFileNamePattern(q);
       setDocSearch('');
+      setIsOpen(false);
     },
     [setFileNamePattern],
   );
@@ -360,6 +368,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
         prev.some((p) => p.doc_id === item.doc_id) || prev.length >= 5 ? prev : [...prev, item],
       );
       setDocSearch('');
+      setIsOpen(false);
     },
     [setFilterDocs],
   );
