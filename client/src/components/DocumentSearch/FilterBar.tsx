@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { ko, enUS } from 'date-fns/locale';
 import { format, parseISO } from 'date-fns';
@@ -169,6 +169,12 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
   const matterMenu = Ariakit.useMenuStore({ open: matterOpen, setOpen: setMatterOpen });
   const selectedMatters = useMemo(() => value.matters ?? [], [value.matters]);
   const matterDisabled = value.library === 'knowledge'; // 지식DB 문서엔 매터가 없다
+  useEffect(() => {
+    if (matterDisabled) {
+      setMatterOpen(false);
+      setMatterSearch('');
+    }
+  }, [matterDisabled]);
   const { data: mattersData, isLoading: mattersLoading } = useBklMattersQuery(
     matterOpen && !matterDisabled,
   );
