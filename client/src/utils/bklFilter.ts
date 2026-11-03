@@ -120,23 +120,27 @@ export const buildBklFilterTag = (
   matterUids?: string[] | null,
   docIds?: string[] | null,
   docLabels?: string[] | null,
+  fileNamePattern?: string | null,
 ): string => {
   const resolved = resolvePeriodFilter(state);
   const matterUidsStr = matterUids && matterUids.length > 0 ? matterUids.join(',') : '';
   const docIdsStr = docIds && docIds.length > 0 ? docIds.join(',') : '';
   const docLabelsStr = docLabels && docLabels.length > 0 ? docLabels.join(',') : '';
+  const fileNameStr = (fileNamePattern ?? '').trim();
   const hasAny =
     resolved.date_from ||
     resolved.date_to ||
     (resolved.extension_groups && resolved.extension_groups.length > 0) ||
     resolved.library ||
     matterUidsStr.length > 0 ||
-    docIdsStr.length > 0;
+    docIdsStr.length > 0 ||
+    fileNameStr.length > 0;
   if (!hasAny) return '';
   const payload: Record<string, unknown> = { ...resolved };
   if (matterUidsStr) payload.matter_uids = matterUidsStr;
   if (docIdsStr) payload.doc_ids = docIdsStr;
   if (docLabelsStr) payload.doc_labels = docLabelsStr;
+  if (fileNameStr) payload.file_name_contains = fileNameStr;
   return `[BKL_FILTER:${JSON.stringify(payload)}] `;
 };
 

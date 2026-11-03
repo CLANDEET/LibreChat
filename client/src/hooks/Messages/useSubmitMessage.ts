@@ -3,7 +3,11 @@ import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { replaceSpecialVars, Constants } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
 import { useAuthContext } from '~/hooks/AuthContext';
-import { buildBklFilterTag, buildBklQueryEnhanceTag, buildBklReferenceTag } from '~/utils/bklFilter';
+import {
+  buildBklFilterTag,
+  buildBklQueryEnhanceTag,
+  buildBklReferenceTag,
+} from '~/utils/bklFilter';
 import { clearDraftNow } from '~/utils';
 import store from '~/store';
 
@@ -20,6 +24,7 @@ export default function useSubmitMessage() {
   const setQueryEnhance = useSetRecoilState(store.queryEnhanceEnabled);
   const filterMatters = useRecoilValue(store.filterBklMatters);
   const filterDocs = useRecoilValue(store.filterBklDocs);
+  const filterFileNamePattern = useRecoilValue(store.filterBklFileNamePattern);
   const referenceMatters = useRecoilValue(store.referenceBklMatters);
   const setActivePrompt = useSetRecoilState(store.activePromptByIndex(index));
 
@@ -45,6 +50,7 @@ export default function useSubmitMessage() {
         filterMatterUids,
         filterDocIds,
         filterDocLabels,
+        filterFileNamePattern,
       );
       const referenceTag = buildBklReferenceTag(referenceMatterUids);
       /* BKL 항목 8: 쿼리 강화 버튼 즉시 실행 — 버튼 클릭 시 입력창에 텍스트가
@@ -91,6 +97,7 @@ export default function useSubmitMessage() {
       setQueryEnhance,
       filterMatters,
       filterDocs,
+      filterFileNamePattern,
       referenceMatters,
     ],
   );

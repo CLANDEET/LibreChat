@@ -2,6 +2,7 @@ import { TextDecoder } from 'util';
 import {
   BKL_QUERY_CHOICES_PENDING_TEXT,
   BKL_QUERY_CHOICES_READY_TEXT,
+  buildBklFilterTag,
   getBklDisplayText,
   parseBklQueryChoices,
   stripBklTags,
@@ -89,6 +90,36 @@ describe('bklFilter', () => {
 
     it('is applied by getBklDisplayText', () => {
       expect(getBklDisplayText('의견서.pptx.md 참조')).toBe('의견서.pptx 참조');
+    });
+  });
+
+  describe('buildBklFilterTag — 파일명 스코프 (file_name_contains)', () => {
+    const parse = (tag: string) =>
+      JSON.parse(tag.replace(/^\[BKL_FILTER:/, '').replace(/\] $/, ''));
+
+    it('패턴만 있어도 태그를 만들고 공백을 다듬는다', () => {
+      const tag = buildBklFilterTag(null, [], [], [], '  SSA ');
+      expect(tag.startsWith('[BKL_FILTER:')).toBe(true);
+      expect(parse(tag)).toEqual({ file_name_contains: 'SSA' });
+    });
+
+    it('빈/공백 패턴은 무시한다', () => {
+      expect(buildBklFilterTag(null, [], [], [], '   ')).toBe('');
+      expect(buildBklFilterTag(null, [], [], [], null)).toBe('');
+    });
+
+    it('매터·개별 문서 선택과 함께 실린다', () => {
+      const tag = buildBklFilterTag(null, ['1001'], ['d1'], ['계약서.pdf'], 'SSA');
+      expect(parse(tag)).toEqual({
+        matter_uids: '1001',
+        doc_ids: 'd1',
+        doc_labels: '계약서.pdf',
+        file_name_contains: 'SSA',
+      });
+    });
+
+    it('기존 호출(인자 4개)은 그대로 동작한다', () => {
+      expect(buildBklFilterTag(null, ['1001'])).toBe('[BKL_FILTER:{"matter_uids":"1001"}] ');
     });
   });
 });

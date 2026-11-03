@@ -4,7 +4,7 @@ import { useRecoilState } from 'recoil';
 import { ko, enUS } from 'date-fns/locale';
 import { format, parseISO } from 'date-fns';
 import { DayPicker } from 'react-day-picker';
-import { Briefcase, Check, FileText, Filter, X } from 'lucide-react';
+import { Briefcase, Check, FileText, Filter, Search, X } from 'lucide-react';
 import { TooltipAnchor } from '@librechat/client';
 import type {
   ExtensionGroup,
@@ -84,6 +84,12 @@ const isActiveFilter = (state: PeriodFilterState): boolean =>
   (state.extensionGroups && state.extensionGroups.length > 0) ||
   (state.library ?? 'all') !== 'all';
 
+/** "'SSA' 포함 문서 전체 적용 (N건)" — 건수는 백엔드가 주면 붙인다. */
+export const fileNameScopeLabel = (q: string, total?: number | null): string => {
+  const base = `'${q.trim()}' 포함 문서 전체 적용`;
+  return typeof total === 'number' ? `${base} (${total.toLocaleString()}건)` : base;
+};
+
 const stopMenuInputEvent = (event: React.SyntheticEvent<HTMLInputElement>) => {
   event.stopPropagation();
 };
@@ -135,6 +141,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
   const [periodFilter, setPeriodFilter] = useRecoilState(store.periodFilter);
   const [filterMatters, setFilterMatters] = useRecoilState(store.filterBklMatters);
   const [filterDocs, setFilterDocs] = useRecoilState(store.filterBklDocs);
+  const [fileNamePattern, setFileNamePattern] = useRecoilState(store.filterBklFileNamePattern);
   const [matterSearch, setMatterSearch] = useState('');
   const [docSearch, setDocSearch] = useState('');
   const { data: mattersData } = useBklMattersQuery(isOpen && activeTab === 'matter');
@@ -205,9 +212,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
       setPeriodFilter((prev) => {
         if (field === 'start') {
           const nextEnd =
-            value && prev.endDate && new Date(value) > new Date(prev.endDate)
-              ? null
-              : prev.endDate;
+            value && prev.endDate && new Date(value) > new Date(prev.endDate) ? null : prev.endDate;
           return { ...prev, preset: 'custom', startDate: value, endDate: nextEnd };
         }
         const nextStart =
@@ -244,19 +249,22 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
     setPeriodFilter(DEFAULT_PERIOD_FILTER);
     setFilterMatters([]);
     setFilterDocs([]);
+    setFileNamePattern(null);
     setMatterSearch('');
     setDocSearch('');
     setActiveField(null);
-  }, [setFilterDocs, setFilterMatters, setPeriodFilter]);
+  }, [setFileNamePattern, setFilterDocs, setFilterMatters, setPeriodFilter]);
 
   const toggleField = useCallback(
     (field: DateField) => setActiveField((prev) => (prev === field ? null : field)),
     [],
   );
 
+  const hasFileNamePattern = !!(fileNamePattern ?? '').trim();
+  const docFilterCount = filterDocs.length + (hasFileNamePattern ? 1 : 0);
   const isActive = useMemo(
-    () => isActiveFilter(periodFilter) || filterMatters.length > 0 || filterDocs.length > 0,
-    [filterDocs.length, filterMatters.length, periodFilter],
+    () => isActiveFilter(periodFilter) || filterMatters.length > 0 || docFilterCount > 0,
+    [docFilterCount, filterMatters.length, periodFilter],
   );
 
   const dpLocale = useMemo(() => {
@@ -299,7 +307,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
       active: selectedExts.length > 0,
     },
     { id: 'matter', label: '사건', count: filterMatters.length, active: filterMatters.length > 0 },
-    { id: 'document', label: '문서', count: filterDocs.length, active: filterDocs.length > 0 },
+    { id: 'document', label: '문서', count: docFilterCount, active: docFilterCount > 0 },
   ];
   const handleSelectTab = useCallback((tab: FilterTab) => {
     setActiveTab(tab);
@@ -331,6 +339,15 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
       setMatterSearch('');
     },
     [setFilterMatters],
+  );
+  const applyFileNamePattern = useCallback(
+    (raw: string) => {
+      const q = raw.trim();
+      if (!q) return;
+      setFileNamePattern(q);
+      setDocSearch('');
+    },
+    [setFileNamePattern],
   );
   const addDoc = useCallback(
     (doc: BklDoc) => {
@@ -366,10 +383,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
             )}
           >
             <div className="flex w-full items-center justify-center gap-2">
-              <Filter
-                className={cn('size-5', isActive && 'text-blue-500')}
-                aria-hidden="true"
-              />
+              <Filter className={cn('size-5', isActive && 'text-blue-500')} aria-hidden="true" />
             </div>
           </Ariakit.MenuButton>
         }
@@ -614,6 +628,19 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
           {activeTab === 'document' && (
             <div className="px-1.5 pb-1">
               <div className="mb-1 flex flex-wrap gap-1">
+                {hasFileNamePattern && (
+                  <button
+                    type="button"
+                    onClick={() => setFileNamePattern(null)}
+                    aria-label={`파일명 스코프 '${fileNamePattern}' 제거`}
+                    title="파일명에 이 키워드가 들어간 문서 전체"
+                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-blue-500/60 bg-blue-500/10 px-2 py-1 text-xs text-text-primary hover:text-text-primary"
+                  >
+                    <Search className="h-3 w-3" />
+                    <span className="max-w-40 truncate">{`파일명: ${fileNamePattern}`}</span>
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
                 {filterDocs.map((d) => (
                   <button
                     key={d.doc_id}
@@ -642,6 +669,17 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
               />
               {docSearch.trim().length >= 2 && (
                 <div className="mt-1 max-h-56 overflow-y-auto rounded-md border border-border-light">
+                  {/* 파일명 스코프 — 개별 문서 대신 "이 키워드가 파일명에 들어간 문서 전체" */}
+                  <button
+                    type="button"
+                    onClick={() => applyFileNamePattern(docSearch)}
+                    className="flex w-full items-center gap-2 border-b border-border-light px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
+                  >
+                    <Search className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {fileNameScopeLabel(docSearch, docsData?.total)}
+                    </span>
+                  </button>
                   {isDocsFetching && (
                     <div className="px-2 py-2 text-xs text-text-tertiary">문서 검색 중...</div>
                   )}
@@ -652,9 +690,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
                       onClick={() => addDoc(doc)}
                       className="block w-full px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
                     >
-                      <div className="truncate font-medium">
-                        {displayNameOf(doc) || doc.doc_id}
-                      </div>
+                      <div className="truncate font-medium">{displayNameOf(doc) || doc.doc_id}</div>
                       <div className="truncate text-text-tertiary">
                         {doc.imanage_doc_id || doc.doc_id}
                       </div>
