@@ -23,7 +23,7 @@ import { mainTextareaId, BadgeItem } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
 import { cn, removeFocusRings } from '~/utils';
-import { BKL_AI_DISCLAIMER } from '~/components/Bkl/brand';
+import { CollapsibleBadges, ToolbarDisclaimer } from './BklCompactToolbar';
 import { parseBklQueryChoices } from '~/utils/bklFilter';
 import QueryChoicesPanel from '../Messages/Content/QueryChoicesPanel';
 import BklMatterMention from './BklMatterMention';
@@ -413,39 +413,20 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
               <div className={`${isRTL ? 'mr-2' : 'ml-2'}`}>
                 <AttachFileChat conversation={conversation} disableInputs={disableInputs} />
               </div>
-              <div
-                data-testid="bkl-toolbar-badges"
-                data-compact={isToolbarCompact ? 'true' : 'false'}
-                className={cn(
-                  'grid transition-[grid-template-columns,opacity] duration-200 ease-out',
-                  isToolbarCompact ? 'grid-cols-[0fr] opacity-0' : 'grid-cols-[1fr] opacity-100',
-                )}
-              >
-                <div className="min-w-0 overflow-hidden">
-                  <BadgeRow
-                    showEphemeralBadges={
-                      !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
-                    }
-                    isSubmitting={isSubmitting}
-                    conversationId={conversationId}
-                    specName={conversation?.spec}
-                    onChange={setBadges}
-                    isInChat={isInChat}
-                  />
-                </div>
-              </div>
+              <CollapsibleBadges compact={isToolbarCompact} collapsible={isInChat && hoverCapable}>
+                <BadgeRow
+                  showEphemeralBadges={
+                    !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
+                  }
+                  isSubmitting={isSubmitting}
+                  conversationId={conversationId}
+                  specName={conversation?.spec}
+                  onChange={setBadges}
+                  isInChat={isInChat}
+                />
+              </CollapsibleBadges>
               <div className="mx-auto flex" />
-              {isInChat && (
-                <span
-                  aria-hidden={!isToolbarCompact}
-                  className={cn(
-                    'pointer-events-none absolute inset-x-0 top-1/2 -translate-y-[calc(50%+4px)] select-none text-center text-[11px] leading-none text-text-secondary transition-opacity duration-200',
-                    isToolbarCompact ? 'opacity-100' : 'opacity-0',
-                  )}
-                >
-                  {BKL_AI_DISCLAIMER}
-                </span>
-              )}
+              {isInChat && <ToolbarDisclaimer visible={isToolbarCompact} />}
               {SpeechToText && (
                 <AudioRecorder
                   methods={methods}
