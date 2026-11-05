@@ -37,7 +37,13 @@ const HarveySyncPanel: React.FC<{ project: ProjectDetail }> = ({ project }) => {
   const done = project.harvey_synced_count ?? 0;
   const isSyncing = status === 'syncing' || harveySync.isLoading;
 
-  const options = useMemo<HarveyProject[]>(() => harveyProjects.data ?? [], [harveyProjects.data]);
+  // 2026-11-05 BKL 요청: 중간 API 가 iManage 연동 이력이 있는 Vault 를 canUpload:false
+  // 로 내려준다 (쓰기 권한 없음도 동일). 그런 프로젝트는 '(업로드 불가)' 로 보여주지
+  // 않고 목록에서 아예 뺀다 — iManage 자동 동기화가 올린 파일을 지워 버리기 때문.
+  const options = useMemo<HarveyProject[]>(
+    () => (harveyProjects.data ?? []).filter((o) => o.can_upload),
+    [harveyProjects.data],
+  );
   const storedId = project.harvey_vault_id ?? null;
   const storedInList = storedId != null && options.some((o) => o.project_id === storedId);
 
@@ -48,8 +54,8 @@ const HarveySyncPanel: React.FC<{ project: ProjectDetail }> = ({ project }) => {
     [options, effectiveId],
   );
 
-  // 연결돼 있던 프로젝트가 목록에서 사라졌다 — 권한 회수 또는 예전 방식으로
-  // 만든 vault. 다른 대상을 골라야 한다는 걸 알려준다.
+  // 연결돼 있던 프로젝트가 목록에서 사라졌다 — 권한 회수, iManage 연동(canUpload:false),
+  // 또는 예전 방식으로 만든 vault. 다른 대상을 골라야 한다는 걸 알려준다.
   const storedMissing =
     storedId != null && !storedInList && harveyProjects.isSuccess && options.length > 0;
   const retargeting = Boolean(target) && storedId != null && effectiveId !== storedId && done > 0;
@@ -176,8 +182,8 @@ const HarveySyncPanel: React.FC<{ project: ProjectDetail }> = ({ project }) => {
         <p className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-500">
           <AlertTriangle className="size-3 shrink-0" aria-hidden="true" />
           이전에 보냈던 Harvey 프로젝트
-          {project.harvey_vault_name ? ` '${project.harvey_vault_name}'` : ''}에 더 이상 접근할 수
-          없습니다. 다른 프로젝트를 선택하세요.
+          {project.harvey_vault_name ? ` '${project.harvey_vault_name}'` : ''}에 더 이상 보낼 수
+          없습니다 (접근 권한 회수 또는 iManage 연동 Vault). 다른 프로젝트를 선택하세요.
         </p>
       )}
 
@@ -189,8 +195,8 @@ const HarveySyncPanel: React.FC<{ project: ProjectDetail }> = ({ project }) => {
 
       {harveyProjects.isSuccess && options.length === 0 && (
         <p className="text-[11px] text-text-tertiary">
-          접근 가능한 Harvey 프로젝트가 없습니다. Harvey에서 프로젝트를 만들거나 공유받은 뒤
-          새로고침하세요.
+          업로드 가능한 Harvey 프로젝트가 없습니다. iManage와 연동되지 않은 새 Vault 프로젝트를
+          만들거나 공유받은 뒤 새로고침하세요.
         </p>
       )}
     </div>
@@ -234,9 +240,8 @@ const TargetPicker: React.FC<{
     >
       <option value="">Harvey 프로젝트 선택</option>
       {options.map((o) => (
-        <option key={o.project_id} value={o.project_id} disabled={!o.can_upload}>
+        <option key={o.project_id} value={o.project_id}>
           {o.project_name}
-          {o.can_upload ? '' : ' (업로드 불가)'}
         </option>
       ))}
     </select>

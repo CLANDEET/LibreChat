@@ -94,13 +94,11 @@ describe('HarveySyncPanel — 대상 선택', () => {
     expect(sendButton()).toBeDisabled();
   });
 
-  it('업로드 불가 프로젝트는 옵션이 비활성이다', () => {
+  it('업로드 불가(canUpload:false — iManage 연동 포함) 프로젝트는 목록에 나오지 않는다', () => {
     render(<HarveySyncPanel project={project()} />);
-    const ro = screen.getByRole('option', { name: /읽기전용/ }) as HTMLOptionElement;
-    expect(ro.disabled).toBe(true);
-    expect(
-      (screen.getByRole('option', { name: '유용한 판례' }) as HTMLOptionElement).disabled,
-    ).toBe(false);
+    expect(screen.queryByRole('option', { name: /읽기전용/ })).toBeNull();
+    expect(screen.queryByText(/업로드 불가/)).toBeNull();
+    expect(screen.getByRole('option', { name: '유용한 판례' })).toBeInTheDocument();
   });
 
   it('대상을 고르면 그 id와 이름으로 전송을 시작한다', async () => {
@@ -137,7 +135,7 @@ describe('HarveySyncPanel — 대상 선택', () => {
         project={project({ harvey_vault_id: 'hp-gone', harvey_vault_name: '옛 프로젝트' })}
       />,
     );
-    expect(screen.getByText(/'옛 프로젝트'에 더 이상 접근할 수 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/'옛 프로젝트'에 더 이상 보낼 수 없습니다/)).toBeInTheDocument();
     expect(picker()).toHaveValue('');
     expect(sendButton()).toBeDisabled();
   });
@@ -170,10 +168,10 @@ describe('HarveySyncPanel — 대상 선택', () => {
 });
 
 describe('HarveySyncPanel — 목록 상태', () => {
-  it('접근 가능한 프로젝트가 없으면 안내한다', () => {
+  it('업로드 가능한 프로젝트가 없으면 안내한다', () => {
     setProjects([]);
     render(<HarveySyncPanel project={project()} />);
-    expect(screen.getByText(/접근 가능한 Harvey 프로젝트가 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText(/업로드 가능한 Harvey 프로젝트가 없습니다/)).toBeInTheDocument();
     expect(picker()).toBeDisabled();
   });
 
