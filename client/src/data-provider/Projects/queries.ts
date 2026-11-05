@@ -5,6 +5,7 @@ import type {
   AddDocumentsResult,
   HarveyProject,
   HarveyRefreshResult,
+  HarveySyncRun,
   HarveySyncStarted,
   ProjectDetail,
   ProjectDocumentInput,
@@ -16,6 +17,7 @@ const BKL_PROXY_BASE = '/bkl';
 export const PROJECTS_QUERY_KEY = ['bklProjects'];
 export const projectQueryKey = (projectId: string) => ['bklProject', projectId];
 export const HARVEY_PROJECTS_QUERY_KEY = ['bklHarveyProjects'];
+export const harveyRunsQueryKey = (projectId: string) => ['bklHarveyRuns', projectId];
 
 /** HTTP 상태코드를 들고 다니는 에러 — UI 에서 404(구버전 API)/403(sid 없음)을 구분해 보여준다. */
 export class ProjectsApiError extends Error {
@@ -228,6 +230,7 @@ export function useHarveySync(): UseMutationResult<
   { projectId: string; harveyProjectId?: string; harveyProjectName?: string }
 > {
   const invalidate = useInvalidateProjects();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ projectId, harveyProjectId, harveyProjectName }) =>
       request<HarveySyncStarted>(`/${projectId}/harvey-sync`, {
@@ -236,6 +239,31 @@ export function useHarveySync(): UseMutationResult<
           ? { harvey_project_id: harveyProjectId, harvey_project_name: harveyProjectName }
           : undefined,
       }),
-    onSuccess: (_data, { projectId }) => invalidate(projectId),
+    onSuccess: (_data, { projectId }) => {
+      invalidate(projectId);
+      queryClient.invalidateQueries({ queryKey: harveyRunsQueryKey(projectId) });
+    },
+  });
+}
+
+/**
+ * 프로젝트의 Harvey 전송 회차 이력 (최신순).
+ *
+ * 전송이 끝나는 시점은 useProject 폴링이 harvey_sync_status 로 알려주므로,
+ * 패널이 그 변화를 보고 refetch 를 부른다 — 여기서 따로 폴링하지 않는다.
+ */
+export function useHarveySyncRuns(
+  projectId: string | null,
+  enabled = true,
+): UseQueryResult<HarveySyncRun[], Error> {
+  return useQuery<HarveySyncRun[], Error>({
+    queryKey: harveyRunsQueryKey(projectId ?? ''),
+    queryFn: async () => {
+      const data = await request<{ runs: HarveySyncRun[] }>(`/${projectId}/harvey-sync/runs`);
+      return data.runs;
+    },
+    enabled: Boolean(projectId) && enabled,
+    staleTime: 10_000,
+    retry: retryOnServerErrorOnly,
   });
 }

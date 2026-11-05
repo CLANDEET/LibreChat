@@ -66,6 +66,40 @@ export interface HarveySyncStarted {
   status: 'syncing';
 }
 
+/** 회차 안에서 원본을 못 구했거나 업로드되지 못한 문서. */
+export interface HarveySyncFailedDoc {
+  doc_id: string;
+  file_name: string | null;
+  reason: string;
+}
+
+/**
+ * Harvey 전송 회차 1건 (`GET /{id}/harvey-sync/runs`).
+ *
+ * 프로젝트 행의 `harvey_sync_*` 는 마지막 상태만 들고 있으므로, 이전에 어디로
+ * 몇 건을 보냈고 무엇이 왜 실패했는지는 이 이력으로 본다. 2026-11 이후 전송부터
+ * 기록된다 — 그 전 회차는 비어 있다.
+ */
+export interface HarveySyncRun {
+  run_id: number;
+  harvey_project_id: string | null;
+  harvey_project_name: string | null;
+  /** 이전 대상과 달라 업로드 기록을 지우고 전부 다시 올린 회차 */
+  target_changed: boolean;
+  status: HarveySyncStatus;
+  /** 회차 시작 시점의 프로젝트 문서 수 */
+  total_docs: number | null;
+  /** 이번 회차에 올리려던(아직 안 올라간) 문서 수 */
+  pending_docs: number | null;
+  uploaded: number;
+  failed: number;
+  remaining: number | null;
+  error: string | null;
+  failed_docs: HarveySyncFailedDoc[];
+  started_at: string;
+  finished_at: string | null;
+}
+
 export interface HarveyRefreshResult {
   refreshed: boolean;
   projects_processed: number | null;
