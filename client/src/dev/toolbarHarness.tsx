@@ -111,13 +111,17 @@ function InputBox({
                 ref={textAreaRef}
                 rows={1}
                 aria-label="메시지 BKL Prism"
-                placeholder="메시지 BKL Prism"
+                placeholder={isInChat ? '답글' : '메시지 BKL Prism'}
                 data-testid="text-input"
-                className="scrollbar-hover m-0 w-full resize-none bg-transparent px-5 py-[13px] placeholder-black/60 outline-none transition-[max-height] duration-200 md:py-3.5"
+                className="scrollbar-hover m-0 block w-full resize-none bg-transparent px-5 py-[13px] placeholder-black/60 outline-none transition-[max-height] duration-200 md:py-3.5"
                 style={{ height: 44, overflowY: 'auto' }}
               />
             </div>
-            {isInChat && <div className="flex items-end pb-2 pr-2">{sendControl}</div>}
+            {isInChat && (
+              <div className="flex items-end pr-2">
+                <div className="flex h-[50px] items-center md:h-[52px]">{sendControl}</div>
+              </div>
+            )}
           </div>
           {isInChat ? (
             <CollapsibleToolbar compact={compact}>{toolbarRow}</CollapsibleToolbar>

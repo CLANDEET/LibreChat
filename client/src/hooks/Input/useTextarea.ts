@@ -18,6 +18,7 @@ import { useInteractionHealthCheck } from '~/data-provider';
 import { useChatContext } from '~/Providers/ChatContext';
 import { globalAudioId } from '~/common';
 import { useLocalize } from '~/hooks';
+import { BKL_REPLY_PLACEHOLDER } from '~/components/Bkl/brand';
 import store from '~/store';
 
 type KeyEvent = KeyboardEvent<HTMLTextAreaElement>;
@@ -27,11 +28,14 @@ export default function useTextarea({
   submitButtonRef,
   setIsScrollable,
   disabled = false,
+  isInChat = false,
 }: {
   textAreaRef: React.RefObject<HTMLTextAreaElement>;
   submitButtonRef: React.RefObject<HTMLButtonElement>;
   setIsScrollable: React.Dispatch<React.SetStateAction<boolean>>;
   disabled?: boolean;
+  /** 대화 중이면 placeholder 를 '답글' 로 (BKL) */
+  isInChat?: boolean;
 }) {
   const localize = useLocalize();
   const getSender = useGetSender();
@@ -94,6 +98,10 @@ export default function useTextarea({
         return localize('com_endpoint_message_not_appendable');
       }
 
+      if (isInChat) {
+        return BKL_REPLY_PLACEHOLDER;
+      }
+
       const sender =
         isAssistant || isAgent
           ? getEntityName({ name: entityName, isAgent, localize })
@@ -136,6 +144,7 @@ export default function useTextarea({
     conversation,
     latestMessage,
     isNotAppendable,
+    isInChat,
   ]);
 
   const handleKeyDown = useCallback(

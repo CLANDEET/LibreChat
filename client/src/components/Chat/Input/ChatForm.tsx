@@ -164,6 +164,14 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     return () => window.removeEventListener('bkl-guided-retry', handler);
   }, [submitMessage]);
 
+  // "대화 중" 은 라우트 기준으로 즉시 판정한다 (기존 대화 URL 이면 메시지가 아직
+  // 로딩 중이어도 true). 메시지 개수만 보면 사이드바에서 대화를 열 때 대기화면
+  // 레이아웃(큰 박스)이 먼저 그려졌다가 줄어드는 깜빡임이 생긴다. 새 대화에서 첫
+  // 메시지를 보낸 직후(아직 conversationId 가 'new')는 메시지 개수로 잡는다.
+  const isInChat =
+    conversationId !== Constants.NEW_CONVO ||
+    (Array.isArray(conversation?.messages) && conversation.messages.length >= 1);
+
   const handleKeyUp = useHandleKeyUp({
     index,
     textAreaRef,
@@ -181,6 +189,7 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     submitButtonRef,
     setIsScrollable,
     disabled: disableInputs,
+    isInChat,
   });
 
   useQueryParams({ textAreaRef });
@@ -250,13 +259,6 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
 
   const isMoreThanThreeRows = visualRowCount > 3;
 
-  // "대화 중" 은 라우트 기준으로 즉시 판정한다 (기존 대화 URL 이면 메시지가 아직
-  // 로딩 중이어도 true). 메시지 개수만 보면 사이드바에서 대화를 열 때 대기화면
-  // 레이아웃(큰 박스)이 먼저 그려졌다가 줄어드는 깜빡임이 생긴다. 새 대화에서 첫
-  // 메시지를 보낸 직후(아직 conversationId 가 'new')는 메시지 개수로 잡는다.
-  const isInChat =
-    conversationId !== Constants.NEW_CONVO ||
-    (Array.isArray(conversation?.messages) && conversation.messages.length >= 1);
   // 대화 중 입력창 박스는 기본 **텍스트 한 줄 + 전송 버튼**. 마우스를 올리면(hover)
   // 박스 안 두 번째 줄(첨부·필터·검색·쿼리 강화·마이크)이 펼쳐져 대기화면과 같은
   // 두 줄이 된다. 키보드로 도구줄에 들어오거나(focus-within) 파일 첨부·배지 편집
@@ -277,7 +279,9 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
   const baseClasses = useMemo(
     () =>
       cn(
-        'md:py-3.5 m-0 w-full resize-none py-[13px] placeholder-black/60 bg-transparent dark:placeholder-white/60 [&:has(textarea:focus)]:shadow-[0_2px_6px_rgba(0,0,0,.05)]',
+        // block: 인라인 textarea 는 줄상자 디센더만큼(≈6px) 아래 여백이 생겨 옆의
+        // 전송 버튼이 텍스트 줄 중앙에서 어긋난다.
+        'md:py-3.5 m-0 block w-full resize-none py-[13px] placeholder-black/60 bg-transparent dark:placeholder-white/60 [&:has(textarea:focus)]:shadow-[0_2px_6px_rgba(0,0,0,.05)]',
         isCollapsed ? 'max-h-[52px]' : 'max-h-[45vh] md:max-h-[55vh]',
         isMoreThanThreeRows ? 'pl-5' : 'px-5',
       ),
@@ -471,8 +475,11 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
                     />
                   </div>
                   {isInChat && (
-                    <div className={cn('flex items-end pb-2', isRTL ? 'pl-2' : 'pr-2')}>
-                      {sendControl}
+                    // 한 줄일 때는 텍스트 줄과 세로 중앙, 여러 줄로 늘어나면 마지막 줄에
+                    // 머문다: 바깥은 아래 정렬, 안쪽은 textarea 한 줄 높이(패딩 13/14px +
+                    // 줄높이 24px) 박스 안에서 중앙 정렬.
+                    <div className={cn('flex items-end', isRTL ? 'pl-2' : 'pr-2')}>
+                      <div className="flex h-[50px] items-center md:h-[52px]">{sendControl}</div>
                     </div>
                   )}
                 </div>
