@@ -111,7 +111,7 @@ function InputBox({
                 ref={textAreaRef}
                 rows={1}
                 aria-label="메시지 BKL Prism"
-                placeholder={isInChat ? '답글' : '메시지 BKL Prism'}
+                placeholder={isInChat ? '답글' : '오늘 어떤 도움을 드릴까요?'}
                 data-testid="text-input"
                 className="scrollbar-hover m-0 block w-full resize-none bg-transparent px-5 py-[13px] placeholder-black/60 outline-none transition-[max-height] duration-200 md:py-3.5"
                 style={{ height: 44, overflowY: 'auto' }}
