@@ -142,6 +142,8 @@ router.get('/usage/by-user', async (req, res) => {
               },
             },
             models: { $push: '$model' },
+            // 기간 내 질의가 있었던 대화 수 (대화 생성일 기준이 아님 — sessions/by-user 와 같은 기준)
+            convo_set: { $addToSet: '$conversationId' },
           },
         },
         {
@@ -150,6 +152,7 @@ router.get('/usage/by-user', async (req, res) => {
             enhances: 1,
             last_active: 1,
             active_days: { $size: '$active_days_set' },
+            conversations: { $size: '$convo_set' },
             models: 1,
           },
         },
@@ -159,17 +162,6 @@ router.get('/usage/by-user', async (req, res) => {
       .toArray();
 
     const userIds = rows.map((row) => row._id).filter(Boolean);
-    let convoMap = new Map();
-    if (userIds.length > 0) {
-      const convos = await db
-        .collection('conversations')
-        .aggregate([
-          { $match: { user: { $in: userIds }, createdAt: range } },
-          { $group: { _id: '$user', conversations: { $sum: 1 } } },
-        ])
-        .toArray();
-      convoMap = new Map(convos.map((convo) => [String(convo._id), convo.conversations]));
-    }
 
     const userMap = await loadUsers(db, userIds, {
       name: 1,
@@ -202,7 +194,7 @@ router.get('/usage/by-user', async (req, res) => {
           queries: row.queries,
           enhances: row.enhances,
           active_days: row.active_days,
-          conversations: convoMap.get(String(row._id)) ?? 0,
+          conversations: row.conversations ?? 0,
           last_active: row.last_active,
           by_model: Object.entries(modelCounts)
             .map(([model, queries]) => ({ model, queries }))

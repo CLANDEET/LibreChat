@@ -486,14 +486,31 @@
 
   /* ── 기간 필터 컴포넌트 ───────────────────────────────────── */
   const PRESET_DAYS = { today: 1, '7d': 7, '30d': 30, '365d': 365 };
-  const PRESET_LABELS = { today: '오늘', '7d': '최근 7일', '30d': '최근 30일', '365d': '최근 1년' };
+  /** 달력월 프리셋 — 월간 보고용 (rolling 30일과 다르다). 값은 현재 달 기준 오프셋. */
+  const PRESET_MONTHS = { thisMonth: 0, lastMonth: -1 };
+  const PRESET_LABELS = {
+    today: '오늘', '7d': '최근 7일', '30d': '최근 30일', thisMonth: '이번 달', lastMonth: '지난달', '365d': '최근 1년',
+  };
+  const PRESET_ORDER = ['today', '7d', '30d', 'thisMonth', 'lastMonth', '365d'];
+
+  /** KST 달력월의 시작·끝 (YYYY-MM-DD). offset 0=이번 달, -1=지난달. */
+  function monthYMD(offset) {
+    const kst = new Date(Date.now() + 9 * 3600 * 1000);
+    const y = kst.getUTCFullYear();
+    const m = kst.getUTCMonth() + offset;
+    const pad = (n) => String(n).padStart(2, '0');
+    const first = new Date(Date.UTC(y, m, 1));
+    const last = new Date(Date.UTC(y, m + 1, 0));
+    const ymd = (d) => d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+    return { from: ymd(first), to: ymd(last) };
+  }
 
   /**
    * 탭마다 독립적인 기간 필터 드롭다운을 mount 요소에 렌더링한다.
    * 기간 상태는 인스턴스 안에만 있으므로 탭 간에 공유되지 않는다.
    * @param {string} mountId  드롭다운을 그릴 요소 id
    * @param {() => void} onChange  기간 변경 시 호출 (보통 A.reloadAll)
-   * @returns {{ params: (extra?: string) => string, label: () => string, preset: () => string|null, setPreset: (preset: string) => void }}
+   * @returns {{ params: (extra?: string) => string, label: () => string, preset: () => string|null, setPreset: (preset: string) => void, bounds: () => { from: Date, to: Date } }}
    */
   function createRangeFilter(mountId, onChange) {
     const rf = { preset: '30d', from: null, to: null };
@@ -507,7 +524,7 @@
       '<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6l4 4 4-4"/></svg>' +
       '</button>' +
       '<div class="range-dropdown">' +
-      Object.keys(PRESET_DAYS)
+      PRESET_ORDER
         .map((k) => `<button class="range-option${k === '30d' ? ' active' : ''}" type="button" data-preset="${k}">${PRESET_LABELS[k]}</button>`)
         .join('') +
       '<div class="range-divider"></div>' +
@@ -534,7 +551,7 @@
 
     /** 프리셋 적용 (UI 동기화 포함). onChange 는 호출자가 결정한다. */
     function applyPreset(preset) {
-      if (!PRESET_DAYS[preset]) return;
+      if (!PRESET_DAYS[preset] && !(preset in PRESET_MONTHS)) return;
       panel.querySelectorAll('.range-option').forEach((b) => b.classList.toggle('active', b.dataset.preset === preset));
       rf.preset = preset;
       rf.from = null;
@@ -564,9 +581,31 @@
       if (onChange) onChange();
     });
 
+    /** 현재 상태를 from/to 문자열로 (days 프리셋이면 null). */
+    function explicitFromTo() {
+      if (rf.from) return { from: rf.from, to: rf.to };
+      if (rf.preset in PRESET_MONTHS) return monthYMD(PRESET_MONTHS[rf.preset]);
+      return null;
+    }
+
     return {
       /** 현재 프리셋 키 (직접 지정 기간이면 null). */
       preset() { return rf.from ? null : rf.preset; },
+      /**
+       * 서버(parseDateRange)와 같은 경계의 Date 쌍 — 기간 내 항목 강조용.
+       * from/to 는 KST 자정~23:59:59, days 프리셋은 지금부터 N일 전.
+       */
+      bounds() {
+        const ft = explicitFromTo();
+        if (ft) {
+          return {
+            from: new Date(ft.from + 'T00:00:00+09:00'),
+            to: ft.to ? new Date(ft.to + 'T23:59:59+09:00') : new Date(),
+          };
+        }
+        const days = PRESET_DAYS[rf.preset] || 30;
+        return { from: new Date(Date.now() - days * 24 * 3600 * 1000), to: new Date() };
+      },
       /**
        * 프리셋을 코드에서 바꾼다 — onChange 를 부르지 않으므로 호출자가 직접
        * 다시 로드해야 한다 (탭 진입 시 기간을 넓히고 한 번만 로드하기 위함).
@@ -574,8 +613,9 @@
       setPreset(preset) { applyPreset(preset); },
       params(extra) {
         let q;
-        if (rf.from) {
-          q = '?from=' + rf.from + (rf.to ? '&to=' + rf.to : '');
+        const ft = explicitFromTo();
+        if (ft) {
+          q = '?from=' + ft.from + (ft.to ? '&to=' + ft.to : '');
         } else {
           q = '?days=' + (PRESET_DAYS[rf.preset] || 30);
         }
@@ -583,7 +623,8 @@
       },
       label() {
         const todayStr = toYMD(new Date());
-        if (rf.from) return rf.from + '_' + (rf.to || todayStr);
+        const ft = explicitFromTo();
+        if (ft) return ft.from + '_' + (ft.to || todayStr);
         const days = PRESET_DAYS[rf.preset] || 30;
         return toYMD(new Date(Date.now() - days * 24 * 3600 * 1000)) + '_' + todayStr;
       },
@@ -697,6 +738,7 @@
     fetchConversationSources,
     openSourceModal,
     createRangeFilter,
+    monthYMD,
     makeChart,
     beginLoading,
     reloadAll,
