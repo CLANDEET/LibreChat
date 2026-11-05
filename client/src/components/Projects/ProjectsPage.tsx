@@ -149,8 +149,11 @@ const ProjectsPage: React.FC = () => {
                 있습니다.
               </p>
               <p className="mt-1 font-semibold text-blue-700 dark:text-blue-400">
-                ※ iManage와 자동 연동된 Vault는 선택하지 마세요. (자동 동기화되어 파일이
-                삭제됩니다.)
+                ※ iManage와 연동된 Vault는 목록에 표시되지 않습니다.
+              </p>
+              <p className="mt-1">
+                목록에 원하는 Vault가 없다면, iManage와 연동되지 않은 새 Vault 프로젝트를 생성한
+                후 ‘Harvey 프로젝트 선택’ 오른쪽의 새로고침(↻) 버튼을 눌러주세요.
               </p>
             </div>
 
