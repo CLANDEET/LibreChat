@@ -1,5 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
+const { COLLECTION: QUERY_LOGS } = require('~/server/services/bklQueryLog');
 const { parseDateRange, getDb, loadConversationMessages } = require('./helpers');
 const {
   isOrgApiEnabled,
@@ -43,6 +44,20 @@ router.get('/users', async (_req, res) => {
   }
 });
 
+/**
+ * 사용자의 세션(대화) 목록 — **기간 내 질의가 있었던 대화** 기준.
+ *
+ * 2026-11-05 이전에는 `conversations.createdAt` 으로 기간을 걸어, 60일 전에 만든
+ * 대화에서 최근 30일에 질의를 쳐도 목록에 나오지 않았고 "메시지 N건" 도 전 기간
+ * user+assistant 합산이라 사용자 표의 질의 수와 맞지 않았다. 이제 `bkl_query_logs`
+ * 를 대화별로 묶어 (사용자 표·채팅 내역·요약과 같은 기준) 기간 내 질의 수를
+ * 돌려준다 — 세션별 `queries` 합 = 사용자 표의 질의 수.
+ *
+ * 삭제된 대화: 로그는 남으므로 소프트 삭제(`bklDeletedAt`)·하드 삭제 모두 포함해
+ * 돌려주고 `deleted_at` / `title` 로 표시한다 (숫자가 표와 맞아야 하므로 숨기지
+ * 않는다). 메시지 열람은 `/sessions/messages` 가 messages 컬렉션을 읽으므로
+ * 하드 삭제된 대화는 비어 있다.
+ */
 router.get('/sessions/by-user', async (req, res) => {
   try {
     const { user_id: userId } = req.query;
@@ -52,56 +67,68 @@ router.get('/sessions/by-user', async (req, res) => {
 
     const { range } = parseDateRange(req.query, 365);
     const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 500));
-    const includeDeleted = req.query.include_deleted === '1';
     const db = getDb();
 
-    const filter = { user: userId, createdAt: range };
-    if (!includeDeleted) {
-      filter.bklDeletedAt = { $exists: false };
-    }
-    const convos = await db
-      .collection('conversations')
-      .find(filter, {
-        projection: { conversationId: 1, title: 1, createdAt: 1, updatedAt: 1, bklDeletedAt: 1 },
-      })
-      .sort({ updatedAt: -1 })
-      .limit(limit)
-      .toArray();
-
-    if (!convos.length) {
-      return res.json({ data: [] });
-    }
-
-    const convoIds = convos.map((convo) => convo.conversationId).filter(Boolean);
-    const msgStats = await db
-      .collection('messages')
+    const stats = await db
+      .collection(QUERY_LOGS)
       .aggregate([
-        { $match: { conversationId: { $in: convoIds } } },
+        { $match: { user: String(userId), createdAt: range, conversationId: { $ne: null } } },
         { $sort: { createdAt: 1 } },
         {
           $group: {
             _id: '$conversationId',
-            msg_count: { $sum: 1 },
-            first_query: { $first: { $cond: [{ $eq: ['$isCreatedByUser', true] }, '$text', null] } },
-            started_at: { $min: '$createdAt' },
+            queries: { $sum: { $cond: [{ $eq: ['$kind', 'query'] }, 1, 0] } },
+            enhances: { $sum: { $cond: [{ $eq: ['$kind', 'query_enhance'] }, 1, 0] } },
+            first_query: { $first: '$textPreview' },
+            first_at: { $min: '$createdAt' },
             last_at: { $max: '$createdAt' },
           },
         },
+        { $sort: { last_at: -1 } },
+        { $limit: limit },
       ])
       .toArray();
-    const statsMap = new Map(msgStats.map((stat) => [stat._id, stat]));
+
+    if (!stats.length) {
+      return res.json({ data: [] });
+    }
+
+    const convoIds = stats.map((s) => s._id);
+    const [convos, totals] = await Promise.all([
+      db
+        .collection('conversations')
+        .find(
+          { conversationId: { $in: convoIds } },
+          { projection: { conversationId: 1, title: 1, createdAt: 1, bklDeletedAt: 1 } },
+        )
+        .toArray(),
+      // 전 기간 질의 수 — "기간 내 5건 / 전체 12건" 표시용
+      db
+        .collection(QUERY_LOGS)
+        .aggregate([
+          { $match: { conversationId: { $in: convoIds }, kind: 'query' } },
+          { $group: { _id: '$conversationId', total: { $sum: 1 } } },
+        ])
+        .toArray(),
+    ]);
+    const convoMap = new Map(convos.map((c) => [c.conversationId, c]));
+    const totalMap = new Map(totals.map((t) => [t._id, t.total]));
 
     res.json({
-      data: convos.map((convo) => {
-        const stats = statsMap.get(convo.conversationId) || {};
+      data: stats.map((s) => {
+        const convo = convoMap.get(s._id);
         return {
-          conversation_id: convo.conversationId,
-          title: convo.title || '(untitled)',
-          started_at: stats.started_at || convo.createdAt,
-          last_at: stats.last_at || convo.updatedAt,
-          msg_count: stats.msg_count || 0,
-          first_query: (stats.first_query || '').slice(0, 120),
-          deleted_at: convo.bklDeletedAt ?? null,
+          conversation_id: s._id,
+          title: convo ? convo.title || '(untitled)' : '(삭제된 대화)',
+          created_at: convo?.createdAt ?? null,
+          started_at: s.first_at,
+          last_at: s.last_at,
+          queries: s.queries,
+          enhances: s.enhances,
+          total_queries: totalMap.get(s._id) ?? s.queries,
+          first_query: (s.first_query || '').slice(0, 120),
+          deleted_at: convo ? (convo.bklDeletedAt ?? null) : null,
+          missing: !convo,
         };
       }),
     });

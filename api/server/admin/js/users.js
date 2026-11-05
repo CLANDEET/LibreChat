@@ -175,8 +175,13 @@
           <div class="session-row-main">
             <div class="session-first-query">${A.escHtml(s.first_query || s.title)}</div>
             <div class="session-meta">
-              <span>${A.fmtKST(s.started_at)}</span><span>메시지 ${s.msg_count}건</span>
-              ${s.deleted_at ? '<span class="badge badge-inactive">삭제됨</span>' : ''}
+              <span>${A.fmtKST(s.started_at)}</span>
+              <span title="기간 내 질의 수 (전 기간 질의 수)">기간 내 질의 ${A.fmtNum(s.queries)}건${
+                s.total_queries > s.queries ? ' / 전체 ' + A.fmtNum(s.total_queries) + '건' : ''
+              }</span>
+              ${s.enhances ? `<span>강화 ${A.fmtNum(s.enhances)}</span>` : ''}
+              ${s.created_at ? `<span title="대화 생성일">대화 시작 ${A.fmtDate(s.created_at)}</span>` : ''}
+              ${s.deleted_at || s.missing ? '<span class="badge badge-inactive">삭제됨</span>' : ''}
             </div>
           </div>
         </div>
@@ -208,8 +213,11 @@
           A.getJSON('/sessions/messages?conversation_id=' + encodeURIComponent(conversationId)),
           A.fetchConversationSources(conversationId),
         ]);
+        // 기간 밖 메시지는 흐리게 — 세션은 "기간 내 질의가 있는 대화" 기준이라 전 기간 메시지가 섞인다
+        const b = range.bounds();
+        const inRange = (m) => { const t = new Date(m.createdAt).getTime(); return t >= b.from.getTime() && t <= b.to.getTime(); };
         inner.innerHTML = j.data.map((m) => `
-          <div style="display:flex; flex-direction:column; align-items:${m.role === 'user' ? 'flex-end' : 'flex-start'};">
+          <div style="display:flex; flex-direction:column; align-items:${m.role === 'user' ? 'flex-end' : 'flex-start'};${inRange(m) ? '' : ' opacity:.45;'}"${inRange(m) ? '' : ' title="기간 밖 메시지"'}>
             <div class="msg-bubble ${m.role}">${
               m.role === 'assistant' ? A.renderAnswer(m.text || '(내용 없음)', sources.lookup(m)) : A.escHtml(m.text || '(내용 없음)')
             }</div>
@@ -401,10 +409,78 @@
     const user = ui.users.find((u) => u.user_id === ui.selectedUserId);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ['시작', '마지막', '메시지 수', '첫 질의', '제목', '삭제 여부'],
-      ...ui.sessions.map((s) => [A.fmtKST(s.started_at), A.fmtKST(s.last_at), s.msg_count, s.first_query, s.title, s.deleted_at ? 'Y' : '']),
+      ['기간 내 첫 질의', '기간 내 마지막 질의', '기간 내 질의', '기간 내 강화', '전체 질의', '대화 생성일', '첫 질의', '제목', '삭제 여부'],
+      ...ui.sessions.map((s) => [
+        A.fmtKST(s.started_at), A.fmtKST(s.last_at), s.queries, s.enhances, s.total_queries,
+        s.created_at ? A.fmtDate(s.created_at) : '', s.first_query, s.title, s.deleted_at || s.missing ? 'Y' : '',
+      ]),
     ]), '세션');
     XLSX.writeFile(wb, 'bkl_세션_' + (user?.name || ui.selectedUserId) + '_' + range.label() + '.xlsx');
+  }
+
+  /**
+   * 월간 보고 엑셀 — 집행부 보고용 "채팅 횟수". 달력월(KST) 기준으로
+   * bkl_query_logs 를 집계한다 (사용자 표·세션 목록과 같은 기준).
+   * 시트: 요약 / 사용자별 / 그룹별. 현재 화면의 기간·그룹 필터와 무관하게 선택한 달 전체.
+   */
+  async function exportMonthlyReport() {
+    const def = A.monthYMD(-1).from.slice(0, 7);
+    const ym = prompt('보고 대상 월 (YYYY-MM)', def);
+    if (!ym) return;
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(ym)) { alert('YYYY-MM 형식으로 입력하세요.'); return; }
+    const [y, m] = ym.split('-').map(Number);
+    const pad = (n) => String(n).padStart(2, '0');
+    const from = ym + '-01';
+    const to = ym + '-' + pad(new Date(Date.UTC(y, m, 0)).getUTCDate());
+    const q = 'from=' + from + '&to=' + to;
+    try {
+      const [summary, usage, usersRes] = await Promise.all([
+        A.getJSON('/summary?' + q),
+        A.getJSON('/usage/by-user?' + q + '&limit=2000'),
+        A.getJSON('/users'),
+      ]);
+      const userInfo = new Map(usersRes.data.map((u) => [String(u._id), u]));
+      const rows = usage.data.map((u) => {
+        const info = userInfo.get(u.user_id) || {};
+        return {
+          name: info.name || info.bkl_user_nm || u.name || u.username || (u.email ? u.email.split('@')[0] : u.user_id),
+          email: u.email || info.email || '',
+          group: info.bkl_group_name ?? u.group_name ?? '',
+          div: info.bkl_div_name ?? '',
+          hq: info.bkl_hq_name ?? '',
+          queries: u.queries, enhances: u.enhances, conversations: u.conversations ?? '',
+          active_days: u.active_days, last_active: u.last_active ? A.fmtKST(u.last_active) : '',
+        };
+      }).sort((a, b) => b.queries - a.queries);
+      const r = summary.range || {};
+      const groups = new Map();
+      for (const row of rows) {
+        const key = row.group || '(그룹 없음)';
+        const g = groups.get(key) || { group: key, users: 0, queries: 0, enhances: 0 };
+        g.users += 1; g.queries += row.queries; g.enhances += row.enhances;
+        groups.set(key, g);
+      }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+        ['항목', '값'],
+        ['보고 대상 월', ym], ['기간(KST)', from + ' ~ ' + to],
+        ['채팅 횟수 (질의)', r.queries ?? ''], ['쿼리 강화 횟수', r.enhances ?? ''],
+        ['활성 사용자 수', r.active_users ?? ''], ['전체 사용자 수', summary.users_total ?? ''],
+        ['집계 기준', 'bkl_query_logs — 사용자가 보낸 질의 1건 = 1회 (삭제·복제 무관), 질의 시각 KST'],
+        ['생성 시각', A.fmtKST(new Date().toISOString())],
+      ]), '요약');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+        ['이름', '이메일', '그룹', '본부', '전문가그룹', '채팅 횟수(질의)', '쿼리 강화', '활동 대화 수', '활동일', '최근 활동'],
+        ...rows.map((x) => [x.name, x.email, x.group, x.div, x.hq, x.queries, x.enhances, x.conversations, x.active_days, x.last_active]),
+      ]), '사용자별');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+        ['그룹', '활성 사용자', '채팅 횟수(질의)', '쿼리 강화'],
+        ...[...groups.values()].sort((a, b) => b.queries - a.queries).map((g) => [g.group, g.users, g.queries, g.enhances]),
+      ]), '그룹별');
+      XLSX.writeFile(wb, 'bkl_월간보고_' + ym + '.xlsx');
+    } catch (e) {
+      alert('월간 보고 생성 실패: ' + e.message);
+    }
   }
 
   /* ── 로드 (항목 1: 상태 보존 리로드) ───────────────────────── */
@@ -518,6 +594,7 @@
     });
   });
   document.getElementById('btn-export-users').addEventListener('click', exportUsers);
+  document.getElementById('btn-export-monthly').addEventListener('click', exportMonthlyReport);
   document.getElementById('btn-export-sessions').addEventListener('click', exportSessions);
   document.getElementById('btn-sync-user-group').addEventListener('click', syncSelectedUserGroup);
   document.getElementById('org-sync-result').addEventListener('click', (e) => {
