@@ -27,5 +27,7 @@ export const BKL_APP_TITLE = 'BKL Prism';
  */
 export const BKL_AI_DISCLAIMER = 'Prism은 AI이므로 실수할 수 있습니다.';
 
-/** 대화 중 입력창 placeholder — 대기화면의 '메시지 BKL Prism' 대신 짧게. */
+/** 대기화면(첫 질문) 입력창 placeholder — 기본 '메시지 BKL Prism' 대신. */
+export const BKL_LANDING_PLACEHOLDER = '오늘 어떤 도움을 드릴까요?';
+/** 대화 중 입력창 placeholder — 짧게. */
 export const BKL_REPLY_PLACEHOLDER = '답글';

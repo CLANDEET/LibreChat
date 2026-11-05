@@ -1,7 +1,6 @@
 import debounce from 'lodash/debounce';
 import { useEffect, useRef, useCallback } from 'react';
 import { useRecoilValue, useRecoilState } from 'recoil';
-import type { TEndpointOption } from 'librechat-data-provider';
 import type { KeyboardEvent } from 'react';
 import {
   forceResize,
@@ -12,13 +11,12 @@ import {
 } from '~/utils';
 import { useAssistantsMapContext } from '~/Providers/AssistantsMapContext';
 import { useAgentsMapContext } from '~/Providers/AgentsMapContext';
-import useGetSender from '~/hooks/Conversations/useGetSender';
 import useFileHandling from '~/hooks/Files/useFileHandling';
 import { useInteractionHealthCheck } from '~/data-provider';
 import { useChatContext } from '~/Providers/ChatContext';
 import { globalAudioId } from '~/common';
 import { useLocalize } from '~/hooks';
-import { BKL_REPLY_PLACEHOLDER } from '~/components/Bkl/brand';
+import { BKL_LANDING_PLACEHOLDER, BKL_REPLY_PLACEHOLDER } from '~/components/Bkl/brand';
 import store from '~/store';
 
 type KeyEvent = KeyboardEvent<HTMLTextAreaElement>;
@@ -38,7 +36,6 @@ export default function useTextarea({
   isInChat?: boolean;
 }) {
   const localize = useLocalize();
-  const getSender = useGetSender();
   const isComposing = useRef(false);
   const agentsMap = useAgentsMapContext();
   const { handleFiles } = useFileHandling();
@@ -102,14 +99,14 @@ export default function useTextarea({
         return BKL_REPLY_PLACEHOLDER;
       }
 
-      const sender =
-        isAssistant || isAgent
-          ? getEntityName({ name: entityName, isAgent, localize })
-          : getSender(conversation as TEndpointOption);
-
-      return `${localize('com_endpoint_message_new', {
-        0: sender ? sender : localize('com_endpoint_ai'),
-      })}`;
+      // 에이전트/어시스턴트 대화는 상대 이름을 유지 ('메시지 <이름>'), 기본 엔드포인트
+      // 대기화면은 BKL 인사말.
+      if (isAssistant || isAgent) {
+        return `${localize('com_endpoint_message_new', {
+          0: getEntityName({ name: entityName, isAgent, localize }) || localize('com_endpoint_ai'),
+        })}`;
+      }
+      return BKL_LANDING_PLACEHOLDER;
     };
 
     const placeholder = getPlaceholderText();
@@ -135,7 +132,6 @@ export default function useTextarea({
     isAgent,
     localize,
     disabled,
-    getSender,
     agentsMap,
     entityName,
     textAreaRef,
