@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HarveySyncPanel from '../HarveySyncPanel';
 import { ProjectsApiError } from '~/data-provider/Projects';
-import type { HarveyProject, ProjectDetail } from '~/data-provider/Projects';
+import type { HarveyProject, HarveySyncRun, ProjectDetail } from '~/data-provider/Projects';
 
 // jest.mock 팩토리는 mock* 접두 변수만 참조할 수 있다 (호이스팅 보호).
 const mockMutateAsync = jest.fn();
@@ -16,6 +16,14 @@ const mockProjects: {
   isSuccess: boolean;
   error: Error | null;
 } = { data: [], isLoading: false, isSuccess: true, error: null };
+const mockRefetchRuns = jest.fn();
+const mockRuns: {
+  data: HarveySyncRun[] | undefined;
+  isLoading: boolean;
+  isSuccess: boolean;
+  error: Error | null;
+  refetch: jest.Mock;
+} = { data: [], isLoading: false, isSuccess: true, error: null, refetch: mockRefetchRuns };
 
 jest.mock('~/data-provider/Projects', () => {
   const actual = jest.requireActual('~/data-provider/Projects');
@@ -30,6 +38,7 @@ jest.mock('~/data-provider/Projects', () => {
       isLoading: mockState.refreshLoading,
     }),
     useHarveyProjects: () => mockProjects,
+    useHarveySyncRuns: () => mockRuns,
   };
 });
 
@@ -85,7 +94,32 @@ beforeEach(() => {
   mockMutateAsync.mockResolvedValue({ started: true });
   mockRefreshAsync.mockResolvedValue({ refreshed: true, projects_processed: 1, snapshot_id: 's' });
   setProjects([HP1, HP_READONLY]);
+  mockRuns.data = [];
+  mockRuns.isLoading = false;
+  mockRuns.isSuccess = true;
+  mockRuns.error = null;
+  mockRefetchRuns.mockResolvedValue(undefined);
 });
+
+function run(overrides: Partial<HarveySyncRun> = {}): HarveySyncRun {
+  return {
+    run_id: 1,
+    harvey_project_id: 'hp-1',
+    harvey_project_name: '유용한 판례',
+    target_changed: false,
+    status: 'synced',
+    total_docs: 3,
+    pending_docs: 3,
+    uploaded: 3,
+    failed: 0,
+    remaining: 0,
+    error: null,
+    failed_docs: [],
+    started_at: '2026-11-05T11:30:00Z',
+    finished_at: '2026-11-05T11:31:00Z',
+    ...overrides,
+  };
+}
 
 describe('HarveySyncPanel — 대상 선택', () => {
   it('대상을 고르기 전에는 보낼 수 없다', () => {
@@ -305,5 +339,156 @@ describe('HarveySyncPanel — 진행 상태', () => {
         message: '이미 동기화가 진행 중입니다',
       }),
     );
+  });
+});
+
+describe('HarveySyncPanel — 상태 배지·진행률', () => {
+  it('상태 배지가 프로젝트 상태를 따라간다', () => {
+    const { rerender } = render(<HarveySyncPanel project={project()} />);
+    expect(screen.getByTestId('harvey-status-badge')).toHaveTextContent('미전송');
+
+    rerender(
+      <HarveySyncPanel
+        project={project({ harvey_vault_id: 'hp-1', harvey_sync_status: 'synced' })}
+      />,
+    );
+    expect(screen.getByTestId('harvey-status-badge')).toHaveTextContent('완료');
+
+    rerender(
+      <HarveySyncPanel
+        project={project({ harvey_vault_id: 'hp-1', harvey_sync_status: 'error' })}
+      />,
+    );
+    expect(screen.getByTestId('harvey-status-badge')).toHaveTextContent('실패');
+  });
+
+  it('진행 중·일부 남음일 때만 진행률 막대를 보여준다', () => {
+    const { rerender } = render(
+      <HarveySyncPanel
+        project={project({
+          harvey_vault_id: 'hp-1',
+          harvey_sync_status: 'syncing',
+          harvey_synced_count: 1,
+        })}
+      />,
+    );
+    const bar = screen.getByRole('progressbar', { name: 'Harvey 전송 진행률' });
+    expect(bar).toHaveAttribute('aria-valuenow', '1');
+    expect(bar).toHaveAttribute('aria-valuemax', '3');
+    expect(screen.getByText('1/3건 · 33%')).toBeInTheDocument();
+
+    rerender(
+      <HarveySyncPanel
+        project={project({
+          harvey_vault_id: 'hp-1',
+          harvey_sync_status: 'synced',
+          harvey_synced_count: 3,
+        })}
+      />,
+    );
+    expect(screen.queryByRole('progressbar')).toBeNull();
+  });
+});
+
+describe('HarveySyncPanel — 전송 내역', () => {
+  it('접혀 있다가 펼치면 회차별 시각·상태·대상·건수를 보여준다', async () => {
+    mockRuns.data = [
+      run({ run_id: 3, status: 'synced', uploaded: 1, pending_docs: 1 }),
+      run({
+        run_id: 2,
+        status: 'partial',
+        uploaded: 1,
+        pending_docs: 2,
+        failed: 1,
+        error: '1건 원본 확보 실패',
+        failed_docs: [
+          { doc_id: 'd2', file_name: 'b.pdf', reason: '원본 파일을 확보하지 못했습니다' },
+        ],
+        started_at: '2026-11-04T01:12:00Z',
+      }),
+      run({
+        run_id: 1,
+        status: 'error',
+        uploaded: 0,
+        harvey_project_name: '옛 프로젝트',
+        target_changed: true,
+        error: '접근 권한이 없습니다',
+        started_at: '2026-11-01T00:00:00Z',
+      }),
+    ];
+    render(
+      <HarveySyncPanel
+        project={project({ harvey_vault_id: 'hp-1', harvey_sync_status: 'synced' })}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: /전송 내역/ });
+    expect(toggle).toHaveTextContent('3회');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryAllByTestId('harvey-run')).toHaveLength(0);
+
+    await userEvent.click(toggle);
+    const rows = screen.getAllByTestId('harvey-run');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent('완료');
+    expect(rows[0]).toHaveTextContent('1건 전송');
+    expect(rows[1]).toHaveTextContent('일부 남음');
+    expect(rows[1]).toHaveTextContent('1/2건 전송');
+    expect(rows[1]).toHaveTextContent('1건 원본 확보 실패');
+    expect(rows[2]).toHaveTextContent('실패');
+    expect(rows[2]).toHaveTextContent('옛 프로젝트');
+    expect(rows[2]).toHaveTextContent('대상 변경');
+    expect(rows[2]).toHaveTextContent('접근 권한이 없습니다');
+  });
+
+  it('회차의 실패 문서를 파일명과 사유로 펼쳐 볼 수 있다', async () => {
+    mockRuns.data = [
+      run({
+        status: 'partial',
+        uploaded: 1,
+        pending_docs: 2,
+        failed: 1,
+        failed_docs: [
+          { doc_id: 'd2', file_name: 'b.pdf', reason: '원본 파일을 확보하지 못했습니다' },
+        ],
+      }),
+    ];
+    render(
+      <HarveySyncPanel
+        project={project({ harvey_vault_id: 'hp-1', harvey_sync_status: 'partial' })}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /전송 내역/ }));
+    expect(screen.queryByText(/b\.pdf/)).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: '실패 문서 1건 보기' }));
+    expect(screen.getByText(/b\.pdf/)).toBeInTheDocument();
+    expect(screen.getByText(/원본 파일을 확보하지 못했습니다/)).toBeInTheDocument();
+  });
+
+  it('내역이 없으면 그렇다고 알려준다', async () => {
+    render(<HarveySyncPanel project={project()} />);
+    expect(screen.getByRole('button', { name: /전송 내역/ })).toHaveTextContent('없음');
+    await userEvent.click(screen.getByRole('button', { name: /전송 내역/ }));
+    expect(screen.getByText(/아직 기록된 전송 내역이 없습니다/)).toBeInTheDocument();
+  });
+
+  it('전송이 끝나면 내역을 다시 읽는다', () => {
+    const { rerender } = render(
+      <HarveySyncPanel
+        project={project({ harvey_vault_id: 'hp-1', harvey_sync_status: 'syncing' })}
+      />,
+    );
+    mockRefetchRuns.mockClear();
+    rerender(
+      <HarveySyncPanel
+        project={project({
+          harvey_vault_id: 'hp-1',
+          harvey_sync_status: 'synced',
+          harvey_synced_at: '2026-11-05T11:31:00Z',
+        })}
+      />,
+    );
+    expect(mockRefetchRuns).toHaveBeenCalled();
   });
 });
