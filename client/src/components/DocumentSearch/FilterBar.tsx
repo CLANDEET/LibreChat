@@ -69,13 +69,14 @@ const LIBRARY_OPTIONS: { id: LibraryFilter; label: string }[] = [
   { id: 'knowledge', label: 'DB 라이브러리' },
 ];
 
-// 매터 선택기 문구 (다른 라벨들처럼 한국어 고정)
+// 케이스(매터) 선택기 문구 (다른 라벨들처럼 한국어 고정). 2026-11-09 BKL 요청: '매터'→'케이스',
+// 검색 placeholder 는 'Our Ref/수임번호/메인이슈'.
 const MATTER_UI = {
-  prefix: '매터:',
+  prefix: '케이스:',
   all: '전체',
   loading: '불러오는 중…',
-  noMatch: '일치하는 사건이 없습니다',
-  empty: '접근 가능한 사건이 없습니다',
+  noMatch: '일치하는 케이스가 없습니다',
+  empty: '접근 가능한 케이스가 없습니다',
 };
 
 function matterButtonLabel(selected: BklMatterSelection[]): string {
@@ -429,8 +430,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
             (matterOpen || selectedMatters.length > 0) && 'border-text-primary',
             matterDisabled && 'cursor-not-allowed opacity-50',
           )}
-          aria-label="매터 선택"
-          title={matterDisabled ? 'DB 라이브러리에는 매터가 없습니다' : undefined}
+          aria-label="케이스 선택"
+          title={matterDisabled ? 'DB 라이브러리에는 케이스가 없습니다' : undefined}
         >
           <Briefcase className="h-4 w-4 text-text-secondary" aria-hidden="true" />
           <span className="text-text-secondary">{MATTER_UI.prefix}</span>
@@ -450,7 +451,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
                   key={m.matter_uid}
                   type="button"
                   onClick={() => removeMatter(m.matter_uid)}
-                  aria-label={`${m.label} 매터 제거`}
+                  aria-label={`${m.label} 케이스 제거`}
                   className="inline-flex max-w-full items-center gap-1 rounded-full border border-border-medium px-2 py-1 text-xs text-text-secondary hover:text-text-primary"
                 >
                   <Briefcase className="h-3 w-3" aria-hidden="true" />
@@ -463,8 +464,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
           <input
             value={matterSearch}
             onChange={(e) => setMatterSearch(e.target.value)}
-            placeholder="사건명/사건번호 검색"
-            aria-label="매터 검색"
+            placeholder="Our Ref/수임번호/메인이슈 검색"
+            aria-label="케이스 검색"
             className="w-full rounded-md border border-border-light bg-surface-primary px-2 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none"
             onKeyDown={(e) => e.stopPropagation()}
             onBeforeInput={stopMenuInputEvent}

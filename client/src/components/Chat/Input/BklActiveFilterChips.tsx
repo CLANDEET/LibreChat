@@ -133,8 +133,8 @@ export default function BklActiveFilterChips() {
       <Chip
         key={`matter-${m.matter_uid}`}
         icon={<Briefcase className="h-3 w-3 shrink-0 text-blue-500" aria-hidden="true" />}
-        label={`사건: ${m.label || m.matter_uid}`}
-        removeLabel={`${m.label || m.matter_uid} 사건 필터 제거`}
+        label={`케이스: ${m.label || m.matter_uid}`}
+        removeLabel={`${m.label || m.matter_uid} 케이스 필터 제거`}
         className="border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-300"
         onRemove={() => setMatters((prev) => prev.filter((x) => x.matter_uid !== m.matter_uid))}
       />,

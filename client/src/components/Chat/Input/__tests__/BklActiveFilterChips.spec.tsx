@@ -82,7 +82,7 @@ describe('BklActiveFilterChips', () => {
     expect(screen.getByText('기간: com_ui_period_last_1_year')).toBeInTheDocument();
     expect(screen.getByText('범위: M 라이브러리')).toBeInTheDocument();
     expect(screen.getByText('확장자: PDF, 기타')).toBeInTheDocument();
-    expect(screen.getByText('사건: 2024가합100')).toBeInTheDocument();
+    expect(screen.getByText('케이스: 2024가합100')).toBeInTheDocument();
     expect(screen.getByText('파일명: SSA')).toBeInTheDocument();
     expect(screen.getByText('문서: 계약서.pdf')).toBeInTheDocument();
   });
@@ -101,7 +101,7 @@ describe('BklActiveFilterChips', () => {
       ],
       pattern: 'SSA',
     });
-    fireEvent.click(screen.getByRole('button', { name: 'A 사건 필터 제거' }));
+    fireEvent.click(screen.getByRole('button', { name: 'A 케이스 필터 제거' }));
     expect(state().matters).toEqual(['1002']);
     fireEvent.click(screen.getByRole('button', { name: '기간 필터 제거' }));
     expect(state().preset).toBe('all');
@@ -109,7 +109,7 @@ describe('BklActiveFilterChips', () => {
     expect(state().pattern).toBeNull();
     // 나머지(범위, 사건 B)는 그대로
     expect(state().library).toBe('knowledge');
-    expect(screen.getByText('사건: B')).toBeInTheDocument();
+    expect(screen.getByText('케이스: B')).toBeInTheDocument();
   });
 
   it('칩이 둘 이상이면 전체 지우기 링크가 붙고 모두 비운다', () => {

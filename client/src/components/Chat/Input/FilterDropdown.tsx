@@ -312,7 +312,12 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
       count: selectedExts.length,
       active: selectedExts.length > 0,
     },
-    { id: 'matter', label: '사건', count: filterMatters.length, active: filterMatters.length > 0 },
+    {
+      id: 'matter',
+      label: '케이스',
+      count: filterMatters.length,
+      active: filterMatters.length > 0,
+    },
     { id: 'document', label: '문서', count: docFilterCount, active: docFilterCount > 0 },
   ];
   const handleSelectTab = useCallback((tab: FilterTab) => {
@@ -606,7 +611,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
               <input
                 value={matterSearch}
                 onChange={(e) => setMatterSearch(e.target.value)}
-                placeholder="사건명/사건번호 검색"
+                placeholder="Our Ref/수임번호/메인이슈 검색"
                 className="w-full rounded-md border border-border-light bg-surface-primary px-2 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none"
                 onKeyDown={(e) => e.stopPropagation()}
                 onBeforeInput={stopMenuInputEvent}
