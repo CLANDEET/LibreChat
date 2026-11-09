@@ -42,12 +42,12 @@ function renderBar(value: DocumentSearchFilterState = EMPTY_DOC_FILTERS) {
   return onChange;
 }
 
-const openMatterMenu = () => fireEvent.click(screen.getByRole('button', { name: '매터 선택' }));
+const openMatterMenu = () => fireEvent.click(screen.getByRole('button', { name: '케이스 선택' }));
 
 describe('FilterBar 매터 선택', () => {
   it('기본은 "전체"이고 열면 내 사건 목록이 뜬다', () => {
     renderBar();
-    expect(screen.getByRole('button', { name: '매터 선택' })).toHaveTextContent('전체');
+    expect(screen.getByRole('button', { name: '케이스 선택' })).toHaveTextContent('전체');
     openMatterMenu();
     expect(screen.getByText('세종 M&A')).toBeInTheDocument();
     expect(screen.getByText('한강 PF')).toBeInTheDocument();
@@ -56,7 +56,7 @@ describe('FilterBar 매터 선택', () => {
   it('검색어로 거르고, 고르면 선택 모델(matter_uid/label/sub)로 onChange 한다', () => {
     const onChange = renderBar();
     openMatterMenu();
-    fireEvent.change(screen.getByLabelText('매터 검색'), { target: { value: '한강' } });
+    fireEvent.change(screen.getByLabelText('케이스 검색'), { target: { value: '한강' } });
     expect(screen.queryByText('세종 M&A')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('한강 PF'));
     expect(onChange).toHaveBeenCalledWith(
@@ -71,9 +71,9 @@ describe('FilterBar 매터 선택', () => {
     openMatterMenu();
     fireEvent.click(screen.getByText('한강 PF'));
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '매터 선택' }).getAttribute('aria-expanded')).toBe(
-        'false',
-      ),
+      expect(
+        screen.getByRole('button', { name: '케이스 선택' }).getAttribute('aria-expanded'),
+      ).toBe('false'),
     );
   });
 
@@ -86,11 +86,13 @@ describe('FilterBar 매터 선택', () => {
       ],
     };
     const onChange = renderBar(selected);
-    expect(screen.getByRole('button', { name: '매터 선택' })).toHaveTextContent('2024가합100 외 1');
+    expect(screen.getByRole('button', { name: '케이스 선택' })).toHaveTextContent(
+      '2024가합100 외 1',
+    );
     openMatterMenu();
     // 이미 고른 사건은 후보 목록에서 빠진다
     expect(screen.queryByText('세종 M&A')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '2024가합100 매터 제거' }));
+    fireEvent.click(screen.getByRole('button', { name: '2024가합100 케이스 제거' }));
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ matters: [{ matter_uid: '1002', label: '2023가단200' }] }),
     );
@@ -109,7 +111,7 @@ describe('FilterBar 매터 선택', () => {
 
   it('DB 라이브러리 상태에서는 매터 버튼이 disabled', () => {
     renderBar({ ...EMPTY_DOC_FILTERS, library: 'knowledge' });
-    expect(screen.getByRole('button', { name: '매터 선택' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '케이스 선택' })).toBeDisabled();
   });
 
   it('매터가 있으면 필터 활성으로 본다', () => {
