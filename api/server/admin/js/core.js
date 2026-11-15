@@ -15,6 +15,10 @@
   const state = {
     currentTab: 'analytics',
     charts: {},
+    // 새로고침 버튼으로 로드 중이면 true — getJSON 이 ?fresh=1 을 붙여 서버 캐시를 우회한다.
+    fresh: false,
+    // 이번 로드에서 받은 응답 중 캐시 히트의 가장 오래된 시각 (화면에 "N분 전 기준" 표시)
+    cacheOldest: null,
   };
 
   const tabs = {}; // name -> { load }
@@ -60,29 +64,35 @@
     }
   }
 
-  /* ── 전역 로딩 오버레이 ─────────────────────────────────────
-   * 어느 탭이든 데이터 요청이 진행 중이면 회색 배경 + 스피너를 띄운다.
-   * getJSON/sendJSON 이 자동으로 카운트하므로 탭 모듈은 신경 쓸 게 없다.
+  /* ── 로딩 표시 ───────────────────────────────────────────────
+   * (1) 우하단 작은 알림(pill): 진행 중 요청 수·경과 시간. 화면을 가리거나 클릭을
+   *     막지 않는다 — 통계 탭은 요청 10개가 동시에 나가는데 가장 느린 하나(Top
+   *     문서 PG 집계)를 기다리느라 전체를 덮으면 이미 도착한 카드도 못 본다.
+   * (2) 섹션 단위: getJSON(path, { section: '#id' }) 로 대상 요소를 주면 그 카드·
+   *     패널만 흐려지고 스피너가 돈다. 도착하는 대로 하나씩 풀린다.
    * - 250ms 안에 끝나는 요청은 깜빡임 방지를 위해 표시하지 않는다.
    * - 백그라운드 폴링·자체 진행 표시가 있는 호출은 { silent: true } 로 제외.
-   * - 3초 넘게 걸리면 경과 시간을 같이 보여준다 (모델·과금 집계 등).
    */
   let pendingCount = 0;
   let overlayTimer = null;
   let tickTimer = null;
   let loadingSince = 0;
   function overlayEl() { return document.getElementById('loading-overlay'); }
+  function renderPill() {
+    const el = overlayEl();
+    if (!el) return;
+    const txt = el.querySelector('.loading-text');
+    const elapsed = el.querySelector('.loading-elapsed');
+    if (txt) txt.textContent = '불러오는 중 · ' + pendingCount + '건';
+    const sec = Math.floor((Date.now() - loadingSince) / 1000);
+    if (elapsed) elapsed.textContent = sec >= 3 ? sec + '초 경과' : '';
+  }
   function showOverlay() {
     const el = overlayEl();
     if (!el) return;
     el.classList.add('show');
-    const txt = el.querySelector('.loading-elapsed');
-    const tick = () => {
-      const sec = Math.floor((Date.now() - loadingSince) / 1000);
-      if (txt) txt.textContent = sec >= 3 ? sec + '초 경과' : '';
-    };
-    tick();
-    if (!tickTimer) tickTimer = setInterval(tick, 1000);
+    renderPill();
+    if (!tickTimer) tickTimer = setInterval(renderPill, 1000);
   }
   function hideOverlay() {
     const el = overlayEl();
@@ -94,34 +104,81 @@
     if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
   }
   let hideTimer = null;
+
+  const SECTION_SELECTOR = '.card, .chart-panel, .table-panel, .ai-summary-panel, .cards-row, .section-box';
+  function sectionOf(target) {
+    const el = typeof target === 'string' ? document.querySelector(target) : target;
+    if (!el) return null;
+    return el.closest(SECTION_SELECTOR) || el;
+  }
+  /** 섹션에 로딩 상태를 건다. 중첩 호출을 세서 마지막 요청이 끝날 때 푼다. */
+  function beginSection(target) {
+    const el = sectionOf(target);
+    if (!el) return () => {};
+    const n = (parseInt(el.dataset.loadingCount, 10) || 0) + 1;
+    el.dataset.loadingCount = String(n);
+    const t = setTimeout(() => { if ((parseInt(el.dataset.loadingCount, 10) || 0) > 0) el.classList.add('is-loading'); }, 150);
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      const left = Math.max(0, (parseInt(el.dataset.loadingCount, 10) || 1) - 1);
+      el.dataset.loadingCount = String(left);
+      if (left === 0) el.classList.remove('is-loading');
+    };
+  }
+
   function beginLoading(opts) {
     if (opts && opts.silent) return () => {};
+    const endSection = opts && opts.section ? beginSection(opts.section) : () => {};
     if (pendingCount++ === 0) {
       if (hideTimer) {
-        // 직전 요청이 막 끝나고 바로 다음 요청 — 연속 로딩으로 취급 (깜빡임·경과시간 리셋 방지)
         clearTimeout(hideTimer); hideTimer = null;
       } else {
         loadingSince = Date.now();
         overlayTimer = setTimeout(() => { overlayTimer = null; if (pendingCount > 0) showOverlay(); }, 250);
       }
+    } else if (overlayEl() && overlayEl().classList.contains('show')) {
+      renderPill();
     }
     let done = false;
     return () => {
       if (done) return;
       done = true;
+      endSection();
       if (--pendingCount <= 0) {
         pendingCount = 0;
         if (overlayTimer) { clearTimeout(overlayTimer); overlayTimer = null; }
         hideTimer = setTimeout(() => { hideTimer = null; if (pendingCount === 0) hideOverlay(); }, 200);
+      } else if (overlayEl() && overlayEl().classList.contains('show')) {
+        renderPill();
       }
     };
+  }
+
+  /** 응답의 cached/cached_at 을 보고 이번 로드의 "가장 오래된 캐시 시각" 을 기억한다. */
+  function noteCache(body) {
+    if (!body || typeof body !== 'object' || !body.cached || !body.cached_at) return;
+    const t = new Date(body.cached_at).getTime();
+    if (!Number.isFinite(t)) return;
+    if (state.cacheOldest == null || t < state.cacheOldest) state.cacheOldest = t;
+  }
+  function cacheNote() {
+    if (state.cacheOldest == null) return '';
+    const min = Math.round((Date.now() - state.cacheOldest) / 60000);
+    return ' · ' + (min <= 0 ? '방금' : min + '분 전') + ' 캐시 기준';
+  }
+  function withFresh(path) {
+    if (!state.fresh) return path;
+    return path + (path.includes('?') ? '&' : '?') + 'fresh=1';
   }
 
   /* ── fetch ────────────────────────────────────────────────── */
   async function getJSON(path, opts) {
     const end = beginLoading(opts);
     try {
-      const r = await fetch(API + path, { headers: authHeaders() });
+      const r = await fetch(API + withFresh(path), { headers: authHeaders() });
       if (r.status === 401) {
         showAuthGate('세션이 만료되었습니다. 토큰을 다시 입력하세요.');
         throw new Error('unauthorized');
@@ -130,7 +187,9 @@
         const body = await r.json().catch(() => ({}));
         throw new Error(body.error || body.detail || path + ' → HTTP ' + r.status);
       }
-      return await r.json();
+      const body = await r.json();
+      noteCache(body);
+      return body;
     } finally {
       end();
     }
@@ -659,6 +718,7 @@
   function switchTab(tab, opts = {}) {
     if (tab === state.currentTab && !opts.force) return;
     state.currentTab = tab;
+    state.cacheOldest = null;
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
     document.getElementById('panel-' + tab).classList.add('active');
@@ -667,19 +727,29 @@
   }
 
   /* ── 리로드 ───────────────────────────────────────────────── */
-  async function reloadAll() {
+  /**
+   * 현재 탭 다시 로드. `opts.fresh` 면 서버 TTL 캐시(5분)를 우회한다 — 새로고침
+   * 버튼이 이걸 쓴다. 기간 변경·탭 전환은 캐시를 그대로 쓴다 (append-only 로그라
+   * 몇 분 지연은 상관없고, 캐시면 즉시 뜬다).
+   */
+  async function reloadAll(opts = {}) {
     const t0 = Date.now();
     const el = document.getElementById('updated-text');
-    el.textContent = '로딩 중...';
+    el.textContent = opts.fresh ? '다시 집계 중...' : '로딩 중...';
+    state.fresh = Boolean(opts.fresh);
+    state.cacheOldest = null;
     try {
       const mod = tabs[state.currentTab];
       if (mod && mod.load) await mod.load();
-      el.textContent = '업데이트 ' + new Date().toLocaleTimeString('ko-KR') + ' (' + (Date.now() - t0) + 'ms)';
+      el.textContent =
+        '업데이트 ' + new Date().toLocaleTimeString('ko-KR') + ' (' + (Date.now() - t0) + 'ms)' + cacheNote();
     } catch (e) {
       if (e.message !== 'unauthorized') {
         el.innerHTML = '<span class="err-text">오류: ' + escHtml(e.message) + '</span>';
         console.error(e);
       }
+    } finally {
+      state.fresh = false;
     }
   }
 
@@ -693,7 +763,7 @@
     document.querySelectorAll('.tab-btn').forEach((btn) => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
-    document.getElementById('btn-refresh').addEventListener('click', reloadAll);
+    document.getElementById('btn-refresh').addEventListener('click', () => reloadAll({ fresh: true }));
     document.getElementById('btn-logout').addEventListener('click', () => {
       localStorage.removeItem(TOKEN_KEY);
       showAuthGate('');
@@ -741,6 +811,7 @@
     monthYMD,
     makeChart,
     beginLoading,
+    beginSection,
     reloadAll,
     switchTab,
     registerTab: (name, mod) => { tabs[name] = mod; },

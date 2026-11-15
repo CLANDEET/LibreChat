@@ -462,22 +462,34 @@ button.src-modal-close.btn-refresh { font-size: 13px; color: #374151; }
 
 /* ── 전역 로딩 오버레이 ───────────────────────────────────── */
 .loading-overlay {
-  position: fixed; inset: 0; z-index: 900;
-  background: rgba(243, 244, 246, 0.62); backdrop-filter: blur(1.5px);
-  display: flex; align-items: center; justify-content: center;
-  opacity: 0; pointer-events: none; transition: opacity .15s ease;
+  /* 우하단 작은 알림. 화면을 가리지 않고 클릭도 막지 않는다 (js/core.js beginLoading). */
+  position: fixed; right: 18px; bottom: 18px; z-index: 900;
+  opacity: 0; pointer-events: none; transform: translateY(6px);
+  transition: opacity .15s ease, transform .15s ease;
 }
-.loading-overlay.show { opacity: 1; pointer-events: auto; cursor: progress; }
+.loading-overlay.show { opacity: 1; transform: none; }
 .loading-card {
-  background: #fff; border: 1px solid #e5e7eb; border-radius: 14px;
-  padding: 22px 30px; min-width: 200px; box-shadow: 0 8px 30px rgba(0,0,0,.08);
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 999px;
+  padding: 8px 14px 8px 10px; box-shadow: 0 6px 24px rgba(0,0,0,.10);
+  display: flex; align-items: center; gap: 9px;
 }
 .loading-spinner {
-  width: 30px; height: 30px; border-radius: 50%;
-  border: 3px solid #e5e7eb; border-top-color: #4f46e5;
+  width: 16px; height: 16px; border-radius: 50%; flex: none;
+  border: 2px solid #e5e7eb; border-top-color: #4f46e5;
   animation: loading-spin .8s linear infinite;
 }
-.loading-text { font-size: 13px; color: #374151; font-weight: 500; }
-.loading-elapsed { font-size: 12px; color: #9ca3af; min-height: 14px; }
+.loading-text { font-size: 12px; color: #374151; font-weight: 500; white-space: nowrap; }
+.loading-elapsed { font-size: 11px; color: #9ca3af; white-space: nowrap; }
+.loading-elapsed:empty { display: none; }
 @keyframes loading-spin { to { transform: rotate(360deg); } }
+
+/* 섹션 단위 로딩 (getJSON(path, { section })) — 해당 카드·패널만 흐려지고 스피너 */
+.is-loading { position: relative; }
+.is-loading > * { opacity: .45; transition: opacity .15s ease; }
+.is-loading::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 22px; height: 22px;
+  margin: -11px 0 0 -11px; border-radius: 50%;
+  border: 2.5px solid #e5e7eb; border-top-color: #4f46e5;
+  animation: loading-spin .8s linear infinite; z-index: 2;
+}
+.cards-row.is-loading::after { top: 50%; }

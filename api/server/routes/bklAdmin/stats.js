@@ -1,8 +1,12 @@
 const express = require('express');
 const { COLLECTION: QUERY_LOGS } = require('~/server/services/bklQueryLog');
 const { ago, parseDateRange, getDb, loadUsers } = require('./helpers');
+const { ttlCache } = require('./cache');
 
 const router = express.Router();
+// 통계 집계는 5분 캐시 (?fresh=1 우회). 질의 이력(/queries/history)은 페이지·필터
+// 조합이 많고 인덱스를 타는 단순 조회라 제외.
+const cached = ttlCache();
 
 /**
  * Statistics endpoints backed by the append-only `bkl_query_logs` collection.
@@ -22,7 +26,7 @@ async function summaryForRange(db, range) {
   return { queries, enhances, active_users: activeUsers.length };
 }
 
-router.get('/summary', async (req, res) => {
+router.get('/summary', cached, async (req, res) => {
   try {
     const db = getDb();
     const { range, prevRange } = parseDateRange(req.query, 30);
@@ -90,7 +94,7 @@ async function dailyForRange(db, range) {
     .toArray();
 }
 
-router.get('/usage/daily', async (req, res) => {
+router.get('/usage/daily', cached, async (req, res) => {
   try {
     const db = getDb();
     const { range, prevRange } = parseDateRange(req.query, 30);
@@ -102,7 +106,7 @@ router.get('/usage/daily', async (req, res) => {
   }
 });
 
-router.get('/usage/hourly', async (req, res) => {
+router.get('/usage/hourly', cached, async (req, res) => {
   try {
     const { range } = parseDateRange(req.query, 7);
     const data = await getDb()
@@ -120,7 +124,7 @@ router.get('/usage/hourly', async (req, res) => {
   }
 });
 
-router.get('/usage/by-user', async (req, res) => {
+router.get('/usage/by-user', cached, async (req, res) => {
   try {
     const { range } = parseDateRange(req.query, 30);
     const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 500, 2000));
@@ -219,7 +223,7 @@ async function byModelForRange(db, range) {
     .toArray();
 }
 
-router.get('/usage/by-model', async (req, res) => {
+router.get('/usage/by-model', cached, async (req, res) => {
   try {
     const db = getDb();
     const { range, prevRange } = parseDateRange(req.query, 30);
@@ -231,7 +235,7 @@ router.get('/usage/by-model', async (req, res) => {
   }
 });
 
-router.get('/usage/by-group', async (req, res) => {
+router.get('/usage/by-group', cached, async (req, res) => {
   try {
     const { range } = parseDateRange(req.query, 30);
     const data = await getDb()
@@ -372,7 +376,7 @@ router.get('/queries/history', async (req, res) => {
   }
 });
 
-router.get('/messages/recent', async (req, res) => {
+router.get('/messages/recent', cached, async (req, res) => {
   try {
     const limit = Math.max(1, Math.min(parseInt(req.query.limit, 10) || 50, 500));
     const db = getDb();
