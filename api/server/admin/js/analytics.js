@@ -13,7 +13,7 @@
   const range = A.createRangeFilter('range-analytics', () => A.reloadAll());
 
   async function loadSummary() {
-    const s = await A.getJSON('/summary' + range.params('compare=prev'));
+    const s = await A.getJSON('/summary' + range.params('compare=prev'), { section: '#summary-cards' });
     data.summary = s;
     const cards = document.querySelectorAll('#summary-cards .card-value');
     const cur = s.range || {};
@@ -32,7 +32,7 @@
   }
 
   async function loadDaily() {
-    const j = await A.getJSON('/usage/daily' + range.params('compare=prev'));
+    const j = await A.getJSON('/usage/daily' + range.params('compare=prev'), { section: '#daily-chart' });
     data.daily = j.data;
     data.dailyPrev = j.prev;
     A.makeChart('daily-chart', 'bar', j.data.map((d) => d.date), [
@@ -49,7 +49,7 @@
   }
 
   async function loadHourly() {
-    const j = await A.getJSON('/usage/hourly' + range.params());
+    const j = await A.getJSON('/usage/hourly' + range.params(), { section: '#hourly-chart' });
     const map = new Map(j.data.map((d) => [d.hour, d.queries]));
     const labels = Array.from({ length: 24 }, (_, i) => i + '시');
     A.makeChart('hourly-chart', 'bar', labels, [{
@@ -59,7 +59,7 @@
   }
 
   async function loadModel() {
-    const j = await A.getJSON('/usage/by-model' + range.params('compare=prev'));
+    const j = await A.getJSON('/usage/by-model' + range.params('compare=prev'), { section: '#model-chart' });
     data.byModel = j.data;
     data.byModelPrev = j.prev;
     A.makeChart('model-chart', 'doughnut', j.data.map((d) => d.model || '(미분류)'),
@@ -69,7 +69,7 @@
 
   async function loadCategories() {
     try {
-      const j = await A.getJSON('/analytics/query-categories' + range.params('compare=prev'));
+      const j = await A.getJSON('/analytics/query-categories' + range.params('compare=prev'), { section: '#category-chart' });
       data.categories = j.data;
       data.categoriesPrev = j.prev;
       A.makeChart('category-chart', 'doughnut', j.data.map((d) => d.category),
@@ -81,7 +81,7 @@
   }
 
   async function loadGroup() {
-    const j = await A.getJSON('/usage/by-group' + range.params());
+    const j = await A.getJSON('/usage/by-group' + range.params(), { section: '#group-chart' });
     data.byGroup = j.data;
     A.makeChart('group-chart', 'bar', j.data.map((d) => d.group_name || '(미확인)'), [
       { label: '질의 수', data: j.data.map((d) => d.queries), backgroundColor: 'rgba(99,102,241,.7)', borderColor: '#6366f1', borderWidth: 1 },
@@ -91,7 +91,7 @@
 
   async function loadTopDocs() {
     try {
-      const j = await A.getJSON('/analytics/top-documents' + range.params('limit=20'));
+      const j = await A.getJSON('/analytics/top-documents' + range.params('limit=20'), { section: '#topdocs-tbody' });
       data.topDocs = j.data;
       const tbody = document.getElementById('topdocs-tbody');
       if (!j.data?.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="4">데이터 없음</td></tr>'; return; }
@@ -109,7 +109,7 @@
 
   async function loadTopCases() {
     try {
-      const j = await A.getJSON('/analytics/top-cases' + range.params('limit=20'));
+      const j = await A.getJSON('/analytics/top-cases' + range.params('limit=20'), { section: '#topcases-tbody' });
       data.topCases = j.data;
       const tbody = document.getElementById('topcases-tbody');
       if (!j.data?.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="4">데이터 없음</td></tr>'; return; }
@@ -126,7 +126,7 @@
   }
 
   async function loadTopUsers() {
-    const j = await A.getJSON('/usage/by-user' + range.params('limit=50'));
+    const j = await A.getJSON('/usage/by-user' + range.params('limit=50'), { section: '#topusers-tbody' });
     data.byUser = j.data;
     const tbody = document.getElementById('topusers-tbody');
     if (!j.data?.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="7">데이터 없음</td></tr>'; return; }
@@ -146,7 +146,7 @@
   }
 
   async function loadRecent() {
-    const j = await A.getJSON('/messages/recent?limit=50');
+    const j = await A.getJSON('/messages/recent?limit=50', { section: '#recent-tbody' });
     const tbody = document.getElementById('recent-tbody');
     if (!j.data?.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="5">데이터 없음</td></tr>'; return; }
     tbody.innerHTML = j.data.map((m) => `<tr>

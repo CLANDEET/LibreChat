@@ -3,6 +3,7 @@ const axios = require('axios');
 const { logger } = require('@librechat/data-schemas');
 const { requireAdminToken } = require('./middleware');
 const { getDb, loadUsers } = require('./helpers');
+const { ttlCache } = require('./cache');
 
 const router = express.Router();
 
@@ -153,7 +154,12 @@ router.use('/sync', async (req, res) => {
  * /users 응답은 lc_user_id(LibreChat user _id) 만 들고 오므로 여기서 Mongo
  * users 컬렉션으로 이름·이메일·그룹을 붙인다 — PG 쪽은 사용자 테이블이 없다.
  */
-router.use('/llm-usage', async (req, res) => {
+// 모델·과금 집계(요약/일별/사용자/최근)만 캐시. 모델 목록·단가·활성 모델 설정은
+// 어드민이 바로 바꾸고 다시 읽는 값이라 제외.
+const llmUsageCache = ttlCache({
+  match: (req) => /^\/(summary|daily|users|recent)(\?|$)/.test(req.url),
+});
+router.use('/llm-usage', llmUsageCache, async (req, res) => {
   const baseUrl = process.env.BKL_API_BASE_URL || 'http://bkl-api:8000';
   const targetUrl = `${baseUrl}/admin/llm-usage${req.url}`;
   const headers = { Accept: 'application/json' };
