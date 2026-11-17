@@ -66,6 +66,10 @@ fileConfig:
         - application/haansoftxhwp
         - application/vnd.hancom.hwpx
         - application/haansofthwpx
+        # 한컴오피스가 기본 연결 프로그램인 Windows 는 .docx/.xlsx/.pptx 를 아래 MIME 으로 보고한다
+        - application/haansoftdocx
+        - application/haansoftxlsx
+        - application/haansoftpptx
         - application/vnd.ms-outlook
         - message/rfc822
         - text/plain
@@ -89,6 +93,10 @@ fileConfig:
       - application/haansoftxhwp
       - application/vnd.hancom.hwpx
       - application/haansofthwpx
+      # 한컴오피스가 기본 연결 프로그램인 Windows 는 .docx/.xlsx/.pptx 를 아래 MIME 으로 보고한다
+      - application/haansoftdocx
+      - application/haansoftxlsx
+      - application/haansoftpptx
       - application/vnd.ms-outlook
       - message/rfc822
       - text/plain
