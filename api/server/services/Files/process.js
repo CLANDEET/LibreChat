@@ -50,10 +50,18 @@ const BKL_ALLOWED_UPLOAD_EXTENSIONS = new Set([
   '.eml',
   '.txt',
   '.md',
+  // 이미지: BKL API → bkl-ocr(Mistral OCR) 로 텍스트화. client/src/utils/files.ts 와 동일하게 유지.
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.webp',
+  '.bmp',
+  '.tif',
+  '.tiff',
 ]);
 
 const BKL_UNSUPPORTED_UPLOAD_MESSAGE =
-  '지원하지 않는 파일 형식입니다. PDF, Word, HWP, PPT, MSG, EML, TXT, MD만 업로드할 수 있습니다.';
+  '지원하지 않는 파일 형식입니다. PDF, Word, HWP, PPT, MSG, EML, TXT, MD, 이미지(PNG/JPG)만 업로드할 수 있습니다.';
 
 const assertBklAllowedUploadExtension = (file) => {
   const ext = path.extname(file?.originalname ?? '').toLowerCase();
@@ -551,9 +559,18 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
      * @param {number} params.bytes
      * @param {string} params.filepath
      * @param {string} params.type
+     * @param {number} [params.width] - 이미지(OCR) 첨부의 썸네일 크기
+     * @param {number} [params.height]
      * @return {Promise<void>}
      */
-    const createTextFile = async ({ text, bytes, filepath, type = 'text/plain' }) => {
+    const createTextFile = async ({
+      text,
+      bytes,
+      filepath,
+      type = 'text/plain',
+      width,
+      height,
+    }) => {
       const textBytes = Buffer.byteLength(text, 'utf8');
       if (textBytes > 15 * megabyte) {
         throw new Error(
@@ -570,6 +587,8 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
         filepath: filepath ?? file.path,
         source: FileSources.text,
         filename: file.originalname,
+        width,
+        height,
         model: messageAttachment ? undefined : req.body.model,
         context: messageAttachment ? FileContext.message_attachment : FileContext.agents,
       });
@@ -589,8 +608,7 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
        * 단, '내 파일' 라이브러리에서 직접 올린 업로드(bkl_library=true)는
        * 보관이 목적이므로 TTL 을 적용하지 않는다.
        */
-      const isBklLibraryUpload =
-        req.body?.bkl_library === 'true' || req.body?.bkl_library === true;
+      const isBklLibraryUpload = req.body?.bkl_library === 'true' || req.body?.bkl_library === true;
       const unusedTTLHours = parseFloat(process.env.BKL_UNUSED_FILE_TTL_HOURS ?? '24');
       const keepUnusedTTL =
         messageAttachment &&
@@ -609,7 +627,32 @@ const processAgentFileUpload = async ({ req, res, metadata }) => {
     if (process.env.BKL_API_BASE_URL) {
       try {
         const { text, bytes } = await parseText({ req, file, file_id, fallback: false });
-        return await createTextFile({ text, bytes, type: file.mimetype });
+        /**
+         * BKL: 이미지도 OCR 텍스트가 본문(source=text → 모델에는 글자만 전달)이지만,
+         * 메시지 말풍선에 썸네일을 보여주려면 실제 이미지 경로가 필요하다.
+         * handleImageUpload 는 원본 temp 파일을 지우므로 반드시 parseText 뒤에 호출한다.
+         * 썸네일 저장이 실패해도 OCR 텍스트 첨부 자체는 살린다.
+         */
+        let imageMeta = {};
+        if (file.mimetype.startsWith('image/')) {
+          try {
+            const imageSource = getFileStrategy(appConfig, { isImage: true });
+            const { handleImageUpload } = getStrategyFunctions(imageSource);
+            const { filepath, width, height } = await handleImageUpload({
+              req,
+              file,
+              file_id,
+              endpoint: metadata.endpoint,
+            });
+            imageMeta = { filepath, width, height };
+          } catch (imgErr) {
+            logger.warn(
+              `[processAgentFileUpload] BKL image thumbnail store failed for "${file.originalname}":`,
+              imgErr,
+            );
+          }
+        }
+        return await createTextFile({ text, bytes, type: file.mimetype, ...imageMeta });
       } catch (err) {
         logger.error(
           `[processAgentFileUpload] BKL API text extraction failed for "${file.originalname}", falling back:`,

@@ -1,6 +1,7 @@
 import debounce from 'lodash/debounce';
 import { useEffect, useRef, useCallback } from 'react';
-import { useRecoilValue, useRecoilState } from 'recoil';
+import { useRecoilValue, useRecoilState, useSetRecoilState } from 'recoil';
+import { Constants, EToolResources } from 'librechat-data-provider';
 import type { KeyboardEvent } from 'react';
 import {
   forceResize,
@@ -17,7 +18,7 @@ import { useChatContext } from '~/Providers/ChatContext';
 import { globalAudioId } from '~/common';
 import { useLocalize } from '~/hooks';
 import { BKL_LANDING_PLACEHOLDER, BKL_REPLY_PLACEHOLDER } from '~/components/Bkl/brand';
-import store from '~/store';
+import store, { ephemeralAgentByConvoId } from '~/store';
 
 type KeyEvent = KeyboardEvent<HTMLTextAreaElement>;
 
@@ -44,6 +45,9 @@ export default function useTextarea({
   const enterToSend = useRecoilValue(store.enterToSend);
 
   const { index, conversation, isSubmitting, filesLoading, setFilesLoading } = useChatContext();
+  const setEphemeralAgent = useSetRecoilState(
+    ephemeralAgentByConvoId(conversation?.conversationId ?? Constants.NEW_CONVO),
+  );
   const latestMessage = useRecoilValue(store.latestMessageFamily(index));
   const [activePrompt, setActivePrompt] = useRecoilState(store.activePromptByIndex(index));
 
@@ -231,10 +235,17 @@ export default function useTextarea({
           });
           timestampedFiles.push(newFile);
         }
-        handleFiles(timestampedFiles);
+        // BKL: 붙여넣은 파일(스크린샷 등)도 첨부 메뉴·드래그와 같은 텍스트 추출(OCR)
+        // 경로를 타게 한다. toolResource 없이 보내면 이미지가 image_url 로 모델에
+        // 직접 전달되는데, Prism 은 이미지를 보지 않으므로 내용이 통째로 사라진다.
+        setEphemeralAgent((prev) => ({
+          ...prev,
+          [EToolResources.context]: true,
+        }));
+        handleFiles(timestampedFiles, EToolResources.context);
       }
     },
-    [handleFiles, setFilesLoading, textAreaRef],
+    [handleFiles, setEphemeralAgent, setFilesLoading, textAreaRef],
   );
 
   return {
