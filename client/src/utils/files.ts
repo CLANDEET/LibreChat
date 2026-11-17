@@ -33,6 +33,15 @@ export const BKL_ALLOWED_UPLOAD_EXTENSIONS = [
   'eml',
   'txt',
   'md',
+  // 이미지는 bkl-ocr(Mistral OCR) 로 글자를 뽑아 다른 문서처럼 텍스트로 취급한다.
+  // 모델이 그림 자체를 보는 것(비전)은 아니다.
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'bmp',
+  'tif',
+  'tiff',
 ] as const;
 
 export const BKL_ALLOWED_UPLOAD_ACCEPT = BKL_ALLOWED_UPLOAD_EXTENSIONS.map((ext) => `.${ext}`).join(
@@ -40,7 +49,7 @@ export const BKL_ALLOWED_UPLOAD_ACCEPT = BKL_ALLOWED_UPLOAD_EXTENSIONS.map((ext)
 );
 
 export const BKL_UNSUPPORTED_UPLOAD_MESSAGE =
-  '지원하지 않는 파일 형식입니다. PDF, Word, HWP, PPT, MSG, EML, TXT, MD만 업로드할 수 있습니다.';
+  '지원하지 않는 파일 형식입니다. PDF, Word, HWP, PPT, MSG, EML, TXT, MD, 이미지(PNG/JPG)만 업로드할 수 있습니다.';
 
 export function getBklFileExtension(name = ''): string {
   const basename = name.split(/[\\/]/).pop() ?? '';
