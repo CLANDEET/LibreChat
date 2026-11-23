@@ -13,6 +13,7 @@ import type { TMessage } from 'librechat-data-provider';
 import type { ReactNode } from 'react';
 import { cn } from '~/utils';
 import { useBklMattersQuery } from '~/data-provider/Matters/queries';
+import { libraryFilterLabel } from '~/utils/bklLibrary';
 
 interface BklMeta {
   dateFrom?: string;
@@ -175,7 +176,7 @@ export default function BklMessageMeta({ message }: { message?: TMessage }) {
       <Chip
         key="library"
         icon={<Library className="h-3 w-3 shrink-0" aria-hidden="true" />}
-        label={`범위: ${meta.library === 'knowledge' ? 'DB 라이브러리' : 'M 라이브러리'}`}
+        label={`범위: ${libraryFilterLabel(meta.library)}`}
       />,
     );
   }

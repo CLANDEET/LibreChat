@@ -3,6 +3,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { ExternalLink, X } from 'lucide-react';
 import { notifyBklSourcesChanged } from '~/utils/bklSourcesEvent';
 import { displayNameFromMeta } from '~/utils/displayName';
+import { isLibrarySource, libraryBiblioLine } from '~/utils/bklLibrary';
 
 export type BklSource = {
   source?: {
@@ -211,7 +212,7 @@ export default function ChunkModal({
     attemptedEnrichmentRef.current = attemptKey;
 
     (async () => {
-      if (docId && resolvedSource) {
+      if (docId && resolvedSource && !isLibrarySource(resolvedSource.metadata?.[0])) {
         const links = await fetchImanageLinksByDocId(docId);
         if (cancelled) return;
         if (links?.imanageUrl || links?.imanageFolderUrl || links?.bimsUrl) {
@@ -238,6 +239,9 @@ export default function ChunkModal({
   const meta = activeSource?.metadata?.[0];
   // 표시명: `_{document_number}`·OCR `.md` 제거 (FILENAME_DISPLAY_FIX_SPEC)
   const fileName = displayNameFromMeta(meta, '출처 문서');
+  // 도서관 문서: iManage 링크 없음 — 서지정보(저자 · 분류)만 표시
+  const isLibrary = isLibrarySource(meta);
+  const biblio = isLibrary ? libraryBiblioLine(meta) : null;
   const pageInfo = meta?.page_info;
   const relevanceRaw = meta?.relevance;
   const chunkText = activeSource?.document?.[0] ?? '';
@@ -283,6 +287,12 @@ export default function ChunkModal({
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-sm font-semibold text-text-primary">{fileName}</h2>
               <div className="mt-1 flex items-center gap-3 text-xs text-text-secondary">
+                {isLibrary && (
+                  <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                    도서관
+                  </span>
+                )}
+                {biblio && <span className="truncate">{biblio}</span>}
                 {pageInfo && <span>{pageInfo}</span>}
                 {relevanceDisplay && (
                   <span className="rounded bg-surface-secondary px-1.5 py-0.5">
@@ -292,7 +302,7 @@ export default function ChunkModal({
               </div>
             </div>
             <div className="ml-3 flex flex-shrink-0 items-center gap-1">
-              {imanageUrl ? (
+              {isLibrary ? null : imanageUrl ? (
                 <a
                   href={imanageUrl}
                   target="_blank"
@@ -316,7 +326,7 @@ export default function ChunkModal({
                   iM 파일
                 </button>
               )}
-              {imanageFolderUrl ? (
+              {isLibrary ? null : imanageFolderUrl ? (
                 <a
                   href={imanageFolderUrl}
                   target="_blank"

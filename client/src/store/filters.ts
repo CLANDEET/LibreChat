@@ -12,8 +12,9 @@ export type PeriodFilterPreset =
 // 문서 검색 FilterBar 와 동일한 6 그룹. 백엔드가 group → 실제 확장자 리스트로 전개한다.
 export type ExtensionGroup = 'pdf' | 'msg' | 'docx' | 'hwpx' | 'pptx' | 'other';
 
-// iManage 라이브러리 선택: matter = 사건 문서(M), knowledge = 지식 DB(DB).
-export type LibraryFilter = 'all' | 'matter' | 'knowledge';
+// iManage 라이브러리 선택: matter = 사건 문서(M), knowledge = 지식 DB(DB), booklib = 도서관(LIB).
+export type { LibraryFilter } from '~/utils/bklLibrary';
+import type { LibraryFilter } from '~/utils/bklLibrary';
 
 export interface PeriodFilterState {
   preset: PeriodFilterPreset;

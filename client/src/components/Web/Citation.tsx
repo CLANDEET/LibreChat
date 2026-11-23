@@ -3,6 +3,7 @@ import { useRecoilValue } from 'recoil';
 import { useToastContext } from '@librechat/client';
 import type { CitationProps } from './types';
 import { SourceHovercard, FaviconImage, getCleanDomain } from '~/components/Web/SourceHovercard';
+import { isLibrarySource } from '~/utils/bklLibrary';
 import { CitationContext, useCitation, useCompositeCitations } from './Context';
 import { useFileDownload } from '~/data-provider';
 import { useLocalize } from '~/hooks';
@@ -271,6 +272,8 @@ export function Citation(props: CitationComponentProps) {
 
     const docId = getDocId(source);
     if (!docId || (directFolderUrl && directBimsUrl)) return;
+    // 도서관 문서는 iManage 문서가 아니다 — 링크 조회를 하지 않는다.
+    if (metadataRecords(source).some((m) => isLibrarySource(m))) return;
 
     let cancelled = false;
     fetchBklCitationImanageLinks(docId)

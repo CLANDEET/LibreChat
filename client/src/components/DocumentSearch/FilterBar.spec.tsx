@@ -114,6 +114,19 @@ describe('FilterBar 매터 선택', () => {
     expect(screen.getByRole('button', { name: '케이스 선택' })).toBeDisabled();
   });
 
+  it('도서관(booklib)으로 바꾸면 매터 선택이 비워지고 버튼이 disabled', () => {
+    const onChange = renderBar({
+      ...EMPTY_DOC_FILTERS,
+      matters: [{ matter_uid: '1001', label: '2024가합100' }],
+    });
+    fireEvent.click(screen.getByRole('radio', { name: '도서관' }));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ library: 'booklib', matters: [] }),
+    );
+    renderBar({ ...EMPTY_DOC_FILTERS, library: 'booklib' });
+    expect(screen.getAllByRole('button', { name: '케이스 선택' }).at(-1)).toBeDisabled();
+  });
+
   it('매터가 있으면 필터 활성으로 본다', () => {
     expect(isFilterActive(EMPTY_DOC_FILTERS)).toBe(false);
     expect(
