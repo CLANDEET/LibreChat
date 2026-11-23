@@ -16,6 +16,7 @@ import { DEFAULT_PERIOD_FILTER } from '~/store/filters';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 import { displayNameOf } from '~/utils/displayName';
+import { LIBRARY_FILTER_OPTIONS } from '~/utils/bklLibrary';
 import store from '~/store';
 import type { BklDocSelection, BklMatterSelection } from '~/store/bkl';
 import {
@@ -56,12 +57,8 @@ const EXTENSION_OPTIONS: { id: ExtensionGroup; label: string; hint: string }[] =
   { id: 'other', label: '기타', hint: 'other' },
 ];
 
-// iManage 라이브러리 선택 — matter: M 라이브러리(사건 문서), knowledge: DB 라이브러리(지식 DB)
-const LIBRARY_OPTIONS: { id: LibraryFilter; label: string }[] = [
-  { id: 'all', label: '전체' },
-  { id: 'matter', label: 'M 라이브러리' },
-  { id: 'knowledge', label: 'DB 라이브러리' },
-];
+// iManage 라이브러리 선택 — matter: M(사건 문서), knowledge: DB(지식 DB), booklib: 도서관
+const LIBRARY_OPTIONS = LIBRARY_FILTER_OPTIONS;
 
 const DATE_FMT = 'yyyy-MM-dd';
 

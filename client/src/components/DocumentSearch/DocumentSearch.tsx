@@ -29,6 +29,7 @@ import {
 import { clearMessagesCache } from '~/utils';
 import SearchBar from './SearchBar';
 import ResultCard from './ResultCard';
+import { libraryHasNoMatters } from '~/utils/bklLibrary';
 import FilterBar, {
   EMPTY_DOC_FILTERS,
   isFilterActive,
@@ -50,9 +51,9 @@ export function toApiFilters(f: DocumentSearchFilterState): KeywordSearchFilters
   if (to) out.date_to = to;
   if (f.extensionGroups.length) out.extension_groups = f.extensionGroups;
   if (f.library && f.library !== 'all') out.library = f.library;
-  // 매터 범위 — 지식DB 범위에서는 의미가 없으므로 보내지 않는다
+  // 매터 범위 — 지식DB·도서관 범위에서는 의미가 없으므로 보내지 않는다
   const matterUids = (f.matters ?? []).map((m) => m.matter_uid).filter(Boolean);
-  if (matterUids.length && f.library !== 'knowledge') out.matter_uids = matterUids;
+  if (matterUids.length && !libraryHasNoMatters(f.library)) out.matter_uids = matterUids;
   return Object.keys(out).length ? out : undefined;
 }
 

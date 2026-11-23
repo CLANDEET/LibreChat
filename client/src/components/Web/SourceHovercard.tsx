@@ -4,6 +4,7 @@ import { ChevronDown, ExternalLink, Paperclip } from 'lucide-react';
 import { VisuallyHidden } from '@ariakit/react';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
+import { isLibrarySource, libraryBiblioLine } from '~/utils/bklLibrary';
 
 export interface SourceData {
   link: string;
@@ -67,6 +68,9 @@ export function SourceHovercard({
 }: SourceHovercardProps) {
   const localize = useLocalize();
   const domain = getCleanDomain(source.link || '');
+  // 도서관 문서: iManage 링크가 없다 — iM 파일/폴더 버튼 대신 서지정보(저자 · 분류)
+  const libraryMeta = isLibrarySource(source.metadata) ? source.metadata : null;
+  const biblio = libraryMeta ? libraryBiblioLine(libraryMeta) : null;
 
   return (
     <span className="relative ml-0.5 inline-block">
@@ -141,7 +145,15 @@ export function SourceHovercard({
                   )}
                 </span>
 
-                <span className="mb-2 flex flex-wrap gap-1.5">
+                {libraryMeta && (
+                  <span className="mb-2 flex flex-wrap items-center gap-1.5 text-xs text-text-secondary">
+                    <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+                      도서관
+                    </span>
+                    {biblio && <span className="truncate">{biblio}</span>}
+                  </span>
+                )}
+                <span className={cn('mb-2 flex flex-wrap gap-1.5', libraryMeta && 'hidden')}>
                   {imanageUrl ? (
                     <a
                       href={imanageUrl}

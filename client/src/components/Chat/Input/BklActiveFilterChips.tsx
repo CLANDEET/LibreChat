@@ -6,6 +6,7 @@ import { cn } from '~/utils';
 import { DEFAULT_PERIOD_FILTER } from '~/store/filters';
 import type { PeriodFilterPreset } from '~/store/filters';
 import store from '~/store';
+import { libraryFilterLabel } from '~/utils/bklLibrary';
 
 /**
  * 입력창 위 "지금 걸려 있는 필터" 칩 줄.
@@ -107,7 +108,7 @@ export default function BklActiveFilterChips() {
       <Chip
         key="library"
         icon={<Library className="h-3 w-3 shrink-0" aria-hidden="true" />}
-        label={`범위: ${periodFilter.library === 'knowledge' ? 'DB 라이브러리' : 'M 라이브러리'}`}
+        label={`범위: ${libraryFilterLabel(periodFilter.library)}`}
         removeLabel="검색 범위 필터 제거"
         onRemove={() => setPeriodFilter((prev) => ({ ...prev, library: 'all' }))}
       />,

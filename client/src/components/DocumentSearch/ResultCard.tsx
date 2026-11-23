@@ -9,6 +9,7 @@ import {
 import { useLocalize } from '~/hooks';
 import { cn, FileTypeIcon, fileExtensionLabel } from '~/utils';
 import { displayNameOf } from '~/utils/displayName';
+import { isLibrarySource, libraryBiblioLine } from '~/utils/bklLibrary';
 
 interface ResultCardProps {
   hit: DocumentHit;
@@ -145,6 +146,10 @@ function formatMetadataValue(value?: string | null): string | null {
 }
 
 function documentMetadataLine(hit: DocumentHit): string | null {
+  // 도서관: 저자(client_name) · 분류(custom4) 서지정보. iManage 편집자/일자는 의미 없음.
+  if (isLibrarySource(hit as unknown as Record<string, unknown>)) {
+    return libraryBiblioLine(hit as unknown as Record<string, unknown>);
+  }
   const values = [
     hit.edit_date,
     hit.last_user,
@@ -267,10 +272,13 @@ const ResultCard: React.FC<ResultCardProps> = ({
     hit.imanage_folder_url ?? null,
   );
 
+  const isLibrary = isLibrarySource(hit as unknown as Record<string, unknown>);
+
   useEffect(() => {
     setImanageFileUrl(hit.imanage_preview_url ?? null);
     setImanageFolderUrl(hit.imanage_folder_url ?? null);
-    if (!hit.doc_id || hit.imanage_folder_url) return;
+    // 도서관 문서는 iManage 문서가 아니다 — 링크 조회 자체를 하지 않는다.
+    if (!hit.doc_id || hit.imanage_folder_url || isLibrary) return;
 
     let cancelled = false;
     fetchImanageLinks(hit.doc_id)
@@ -285,7 +293,7 @@ const ResultCard: React.FC<ResultCardProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [hit.doc_id, hit.imanage_folder_url, hit.imanage_preview_url]);
+  }, [hit.doc_id, hit.imanage_folder_url, hit.imanage_preview_url, isLibrary]);
 
   const metaBadges = [hit.work_type, hit.document_type, hit.practice_area_primary].filter(
     Boolean,
@@ -329,6 +337,11 @@ const ResultCard: React.FC<ResultCardProps> = ({
         {hit.source_library === 'DB' && (
           <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
             DB 라이브러리
+          </span>
+        )}
+        {isLibrary && (
+          <span className="shrink-0 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
+            도서관
           </span>
         )}
         {hit.title_match && (

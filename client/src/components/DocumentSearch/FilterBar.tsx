@@ -14,8 +14,10 @@ import {
 import type { BklMatter } from '~/data-provider/Matters/queries';
 
 export type ExtensionGroup = 'pdf' | 'msg' | 'docx' | 'hwpx' | 'pptx' | 'other';
-// iManage 라이브러리: matter = 사건 문서(M), knowledge = 지식 DB(DB)
-export type LibraryFilter = 'all' | 'matter' | 'knowledge';
+// iManage 라이브러리: matter = 사건 문서(M), knowledge = 지식 DB(DB), booklib = 도서관(LIB)
+export type { LibraryFilter } from '~/utils/bklLibrary';
+import type { LibraryFilter } from '~/utils/bklLibrary';
+import { LIBRARY_FILTER_OPTIONS, libraryHasNoMatters } from '~/utils/bklLibrary';
 export type PeriodPreset =
   | 'all'
   | 'last_3_months'
@@ -63,11 +65,7 @@ const EXTENSION_OPTIONS: {
   { id: 'other', label: '기타', hint: 'other' },
 ];
 
-const LIBRARY_OPTIONS: { id: LibraryFilter; label: string }[] = [
-  { id: 'all', label: '전체' },
-  { id: 'matter', label: 'M 라이브러리' },
-  { id: 'knowledge', label: 'DB 라이브러리' },
-];
+const LIBRARY_OPTIONS = LIBRARY_FILTER_OPTIONS;
 
 // 케이스(매터) 선택기 문구 (다른 라벨들처럼 한국어 고정). 2026-11-09 BKL 요청: '매터'→'케이스',
 // 검색 placeholder 는 'Our Ref/수임번호/메인이슈'.
@@ -169,7 +167,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
   const [matterSearch, setMatterSearch] = useState('');
   const matterMenu = Ariakit.useMenuStore({ open: matterOpen, setOpen: setMatterOpen });
   const selectedMatters = useMemo(() => value.matters ?? [], [value.matters]);
-  const matterDisabled = value.library === 'knowledge'; // 지식DB 문서엔 매터가 없다
+  const matterDisabled = libraryHasNoMatters(value.library); // 지식DB·도서관 문서엔 매터가 없다
   useEffect(() => {
     if (matterDisabled) {
       setMatterOpen(false);
@@ -404,8 +402,8 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
                 onChange({
                   ...value,
                   library: opt.id,
-                  // 지식DB 범위에는 매터가 없으므로 선택을 비운다
-                  matters: opt.id === 'knowledge' ? [] : (value.matters ?? []),
+                  // 지식DB·도서관 범위에는 매터가 없으므로 선택을 비운다
+                  matters: libraryHasNoMatters(opt.id) ? [] : (value.matters ?? []),
                 })
               }
               className={cn(
@@ -431,7 +429,7 @@ const FilterBar: React.FC<FilterBarProps> = ({ value, onChange, disabled }) => {
             matterDisabled && 'cursor-not-allowed opacity-50',
           )}
           aria-label="케이스 선택"
-          title={matterDisabled ? 'DB 라이브러리에는 케이스가 없습니다' : undefined}
+          title={matterDisabled ? '이 라이브러리에는 케이스가 없습니다' : undefined}
         >
           <Briefcase className="h-4 w-4 text-text-secondary" aria-hidden="true" />
           <span className="text-text-secondary">{MATTER_UI.prefix}</span>

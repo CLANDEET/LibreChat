@@ -14,8 +14,8 @@ export interface KeywordSearchFilters {
   matter_uid?: string;
   /** 매터(사건) 범위 — OpenSearch terms: matter_uid. 비어 있으면 전체. */
   matter_uids?: string[];
-  /** iManage 라이브러리 범위: "matter"(사건 문서, M) | "knowledge"(지식 DB). 생략 시 전체. */
-  library?: 'matter' | 'knowledge';
+  /** iManage 라이브러리 범위: "matter"(사건 문서, M) | "knowledge"(지식 DB) | "booklib"(도서관). 생략 시 전체. */
+  library?: 'matter' | 'knowledge' | 'booklib';
 }
 
 export interface KeywordSearchRequest {
@@ -54,8 +54,10 @@ export interface DocumentHit {
   practice_area_primary: string | null;
   score: number;
   chunk_count: number;
-  /** "M"(사건 문서) | "DB"(지식 DB) — 하이라이트 배지용 */
+  /** "M"(사건 문서) | "DB"(지식 DB) | "LIB"(도서관) — 하이라이트 배지용 */
   source_library?: string | null;
+  /** 도서관: 제목 (iManage bims_case_name). file_name 은 숫자 ID 라 display_name 이 이 값이다. */
+  bims_case_name?: string | null;
   title_match?: boolean;
   /** 매칭 단계. "exact" 가 아니면 완화 검색으로 보탠 "유사 결과". */
   match_tier?: 'exact' | 'phrase' | 'token';
