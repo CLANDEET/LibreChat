@@ -1,4 +1,4 @@
-import { bklIdentityHeaders, withBklIdentityHeaders } from './bklIdentity';
+import { bklIdentityHeaders, bklRequestId, withBklIdentityHeaders } from './bklIdentity';
 import type { BklUser } from './bklIdentity';
 
 const fullUser: BklUser = {
@@ -62,9 +62,13 @@ describe('withBklIdentityHeaders', () => {
     expect(withBklIdentityHeaders(headers, { user: fullUser })).toBe(headers);
   });
 
-  it('returns headers unchanged when there is no authenticated user', () => {
+  it('still attaches a request id when there is no authenticated user', () => {
     const headers = { 'X-LC-User-Role': '{{LIBRECHAT_USER_ROLE}}' };
-    expect(withBklIdentityHeaders(headers, { user: null })).toBe(headers);
+    const result = withBklIdentityHeaders(headers, { user: null });
+    expect(result).toEqual({
+      'X-LC-User-Role': '{{LIBRECHAT_USER_ROLE}}',
+      'X-Request-Id': expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
   });
 
   it('overrides placeholder identity headers with real values and adds the sid', () => {
@@ -82,11 +86,32 @@ describe('withBklIdentityHeaders', () => {
       'X-BKL-User-Nm': encodeURIComponent('손정현'),
       'X-LC-User-Id': 'lc-mongo-id',
       'X-LC-User-Email': 'jhson@bkl.co.kr',
+      'X-Request-Id': expect.stringMatching(/^[0-9a-f-]{36}$/),
     });
     expect(headers['X-BKL-User-Id']).toBe('{{LIBRECHAT_USER_ID}}');
   });
 
   it('passes through undefined headers', () => {
     expect(withBklIdentityHeaders(undefined, { user: fullUser })).toBeUndefined();
+  });
+});
+
+describe('bklRequestId', () => {
+  it('forwards a well-formed client X-BKL-Request-Id', () => {
+    expect(bklRequestId({ headers: { 'x-bkl-request-id': 'req_abc12345' } })).toBe('req_abc12345');
+  });
+
+  it('mints a UUID when the client id is missing or malformed', () => {
+    expect(bklRequestId({})).toMatch(/^[0-9a-f-]{36}$/);
+    expect(bklRequestId({ headers: { 'x-bkl-request-id': 'bad id!' } })).toMatch(/^[0-9a-f-]{36}$/);
+    expect(bklRequestId({ headers: { 'x-bkl-request-id': 'short' } })).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('is forwarded to the ai-api as X-Request-Id when the endpoint opted in', () => {
+    const result = withBklIdentityHeaders(
+      { 'X-BKL-User-Id': '{{LIBRECHAT_USER_ID}}' },
+      { user: fullUser, headers: { 'x-bkl-request-id': 'req_abc12345' } },
+    );
+    expect(result?.['X-Request-Id']).toBe('req_abc12345');
   });
 });

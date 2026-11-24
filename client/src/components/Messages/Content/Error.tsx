@@ -1,5 +1,4 @@
 // file deepcode ignore HardcodedNonCryptoSecret: No hardcoded secrets
-import { useState } from 'react';
 import { ViolationTypes, ErrorTypes, alternateName } from 'librechat-data-provider';
 import type { LocalizeFunction } from '~/common';
 import { formatJSON, extractJson, isJson } from '~/utils/json';
@@ -126,12 +125,15 @@ const errorMessages = {
 
 /**
  * BKL: 유형화된 한글 오류 안내 — raw `502 Bad Gateway` / 내부 메시지 대신
- * 코드표(utils/bklErrors) 의 제목·안내문 + 요청 ID 를 보여준다. 원문은
- * "자세히" 토글 뒤에 둔다 (관리자 문의 시 복사용).
+ * 코드표(utils/bklErrors) 의 제목·안내문 + 오류 코드 + 요청 ID 만 보여준다.
+ *
+ * 렌더링 계약 (2026-11-24):
+ *   본문    error.message 에 대응하는 코드별 한글 안내
+ *   자세히  error.code · error.request_id 만
+ *   detail  사용하지 않음 (하위 호환 전용 — 서버 원문이 섞일 수 있어 비노출)
  */
 export function BklErrorNotice({ error }: { error: BklClassifiedError }) {
-  const [showRaw, setShowRaw] = useState(false);
-  const { spec, requestId, raw } = error;
+  const { spec, requestId } = error;
   return (
     <div data-testid="bkl-error-notice" data-code={spec.code} className="flex flex-col gap-1">
       <div className="font-semibold">{spec.title}</div>
@@ -145,21 +147,7 @@ export function BklErrorNotice({ error }: { error: BklClassifiedError }) {
             요청 ID: <code data-testid="bkl-error-rid">{requestId}</code>
           </span>
         ) : null}
-        {raw ? (
-          <button
-            type="button"
-            onClick={() => setShowRaw((v) => !v)}
-            className="underline underline-offset-2 hover:opacity-100"
-          >
-            {showRaw ? '원문 숨기기' : '자세히'}
-          </button>
-        ) : null}
       </div>
-      {showRaw && raw ? (
-        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-black/5 p-2 text-[11px] dark:bg-white/5">
-          {raw.length > 1200 ? raw.slice(0, 1200) + '…' : raw}
-        </pre>
-      ) : null}
     </div>
   );
 }
