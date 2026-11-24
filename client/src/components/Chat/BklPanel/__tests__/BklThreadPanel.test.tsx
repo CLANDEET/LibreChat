@@ -6,7 +6,7 @@
  * 문서 입력이 선택과 일치하는지 실제 패널을 렌더해 검증한다.
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { RecoilRoot } from 'recoil';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -124,7 +124,13 @@ describe('toProjectDocuments', () => {
 
   it('maps selected files with doc_id to chat-origin project inputs', () => {
     expect(toProjectDocuments(files, new Set(['doc-a', '업로드.pdf']), 'bkl')).toEqual([
-      { doc_id: 'doc-a', collection: 'bkl', file_name: '계약서.pdf', matter_uid: 'M-1', origin: 'chat' },
+      {
+        doc_id: 'doc-a',
+        collection: 'bkl',
+        file_name: '계약서.pdf',
+        matter_uid: 'M-1',
+        origin: 'chat',
+      },
     ]);
   });
 
@@ -149,7 +155,13 @@ describe('BklThreadPanel multi-select', () => {
     expect(screen.getByText('1건 선택')).toBeInTheDocument();
     expect(screen.getByText('프로젝트에 담기')).toBeInTheDocument();
     expect(popoverDocs[popoverDocs.length - 1]).toEqual([
-      { doc_id: 'doc-a', collection: 'bkl', file_name: '계약서.pdf', matter_uid: 'M-1', origin: 'chat' },
+      {
+        doc_id: 'doc-a',
+        collection: 'bkl',
+        file_name: '계약서.pdf',
+        matter_uid: 'M-1',
+        origin: 'chat',
+      },
     ]);
 
     fireEvent.click(screen.getByLabelText('선택 해제'));
@@ -167,20 +179,19 @@ describe('BklThreadPanel multi-select', () => {
   });
 });
 
-describe('BklThreadPanel chunk iManage link', () => {
-  it('shows a link button per cited chunk, filled from the file when the chunk lacks one', () => {
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+describe('BklThreadPanel chunk quick links (iM 뷰어 · iM 폴더 · BIMS)', () => {
+  it('shows the viewer link per cited chunk, filled from the file when the chunk lacks one', async () => {
     renderPanel();
 
-    // 계약서.pdf: 청크 [1] 은 자체 링크, 청크 [4] 는 파일 링크 폴백 → 둘 다 버튼
-    const links = screen.getAllByLabelText('계약서.pdf iManage 원문 열기');
-    expect(links).toHaveLength(2);
-    // 링크가 전혀 없는 문서는 버튼 없음
-    expect(screen.queryByLabelText('의견서.docx iManage 원문 열기')).toBeNull();
-    expect(screen.queryByLabelText('업로드.pdf iManage 원문 열기')).toBeNull();
-
-    fireEvent.click(links[1]);
-    expect(openSpy).toHaveBeenCalledWith(IMANAGE_A, '_blank', 'noopener');
-    openSpy.mockRestore();
+    // 계약서.pdf: 청크 [1] 은 자체 링크, 청크 [4] 는 파일 링크 폴백, 파일 행 1개 → 3개
+    const links = screen.getAllByLabelText('iManage 원문 열기');
+    expect(links).toHaveLength(3);
+    links.forEach((a) => expect(a).toHaveAttribute('href', IMANAGE_A));
+    // 링크가 전혀 없는 문서(의견서/업로드)는 비활성 자리만 — 청크 2 + 파일 2 = 4
+    // (doc_id 있는 의견서는 jsdom 에 fetch 가 없어 즉시 "링크 없음" 으로 정착)
+    await waitFor(() => expect(screen.getAllByLabelText(/iM 뷰어 — 링크 없음/)).toHaveLength(4));
+    // 폴더·BIMS 는 메타에 없으므로 모든 M 행에서 비활성 자리 유지 (청크 4 + 파일 3)
+    expect(screen.getAllByLabelText(/iM 폴더 — 링크 없음/)).toHaveLength(7);
+    expect(screen.getAllByLabelText(/BIMS — 링크 없음/)).toHaveLength(7);
   });
 });

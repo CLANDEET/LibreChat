@@ -7,7 +7,8 @@ import { cn, FileTypeIcon } from '~/utils';
 import { stripDisplayExtension } from '~/utils/fileTypeIcon';
 import { displayNameFromMeta } from '~/utils/displayName';
 import AddToProjectPopover from '~/components/Projects/AddToProjectPopover';
-import { SourceExternalLink, SourceDisabledLink, SourcePopupLink } from './SourceLinkButtons';
+import { SourceQuickLinksView } from './SourceQuickLinks';
+import { fetchImanageDetails, useSourceLinks } from '~/utils/bklSourceLinks';
 import MarkdownLite from './MarkdownLite';
 import type { BklSource } from './ChunkModal';
 
@@ -109,39 +110,8 @@ const IMANAGE_LINK_FIELDS = [
   'bims_url',
 ] as const;
 
-// doc_id → `/v1/imanage-links` 응답. PG `document_tags` 는 세션 중 바뀌지
-// 않으므로 문서당 한 번만 왕복하고, 동시 호출은 진행 중인 Promise 를
-// 공유한다 (패널 본문과 iM/BIMS 버튼이 같은 doc 을 동시에 찾는다).
-// 404(링크 없음)는 정상 응답이므로 null 로 캐시하고, 전송 실패만
-// 캐시하지 않아 다음 마운트에서 다시 시도한다.
-const imanageDetailsCache = new Map<string, ImanageDetails | null>();
-const imanageDetailsInflight = new Map<string, Promise<ImanageDetails | null>>();
-
-function fetchImanageDetails(docId: string): Promise<ImanageDetails | null> {
-  if (imanageDetailsCache.has(docId)) {
-    return Promise.resolve(imanageDetailsCache.get(docId) ?? null);
-  }
-  const pending = imanageDetailsInflight.get(docId);
-  if (pending) return pending;
-
-  const request = fetch(`/bkl/v1/imanage-links/${encodeURIComponent(docId)}`)
-    .then((r) => {
-      if (r.status === 404) return null;
-      if (!r.ok) throw new Error(`imanage-links ${r.status}`);
-      return r.json() as Promise<ImanageDetails>;
-    })
-    .then((details) => {
-      imanageDetailsCache.set(docId, details);
-      return details;
-    })
-    .catch(() => null)
-    .finally(() => {
-      imanageDetailsInflight.delete(docId);
-    });
-
-  imanageDetailsInflight.set(docId, request);
-  return request;
-}
+// doc_id → `/v1/imanage-links` (문서당 1회 캐시) — utils/bklSourceLinks 로 이동, 목록 행의
+// SourceQuickLinks 와 같은 캐시를 쓴다.
 
 /**
  * Merge a `/v1/imanage-links` response into a citation.
@@ -552,54 +522,11 @@ function AddToProjectButton({ source }: { source: BklSource | null }) {
 }
 
 function ExternalSystemButtons({ source }: { source: BklSource | null }) {
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [bimsUrl, setBimsUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    setFileUrl(null);
-    setBimsUrl(null);
-    if (!source) return;
-    const meta = source.metadata?.[0] as Record<string, unknown> | undefined;
-    const directFile =
-      source.source?.imanage_url ??
-      source.source?.imanage_preview_url ??
-      (typeof meta?.imanage_url === 'string' ? (meta.imanage_url as string) : null) ??
-      (typeof meta?.imanage_preview_url === 'string' ? (meta.imanage_preview_url as string) : null);
-    const directBims =
-      source.source?.bims_url ??
-      (typeof meta?.bims_url === 'string' ? (meta.bims_url as string) : null);
-    setFileUrl(directFile);
-    setBimsUrl(directBims);
-
-    // PG document_tags 에 iManage 검색 링크(imanage_preview_url)가 전건
-    // 채워져 있으므로, Qdrant payload 값은 임시 표시용이고 API 응답(PG)이
-    // 항상 최종 값으로 덮어쓴다 — 조건부 skip 없이 항상 호출 (2026-08-26).
-    // 왕복은 `fetchImanageDetails` 의 doc_id 캐시가 문서당 1회로 묶는다.
-    const docId = typeof meta?.doc_id === 'string' && meta.doc_id ? (meta.doc_id as string) : null;
-    if (!docId) return;
-    let cancelled = false;
-    fetchImanageDetails(docId).then((data) => {
-      if (cancelled || !data) return;
-      const nextFile = (data.imanage_url ?? data.imanage_preview_url ?? null) as string | null;
-      if (nextFile) setFileUrl(nextFile);
-      if (typeof data.bims_url === 'string' && data.bims_url) setBimsUrl(data.bims_url);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [source]);
-
-  if (!fileUrl && !bimsUrl) return null;
-  return (
-    <>
-      {fileUrl ? (
-        <SourceExternalLink href={fileUrl} label="iM" />
-      ) : (
-        <SourceDisabledLink label="iM" />
-      )}
-      {bimsUrl && <SourcePopupLink href={bimsUrl} label="BIMS" popupName="bims_popup" />}
-    </>
-  );
+  // 코퍼스별 3단 링크 (iM 뷰어 · iM 폴더 · BIMS / DB: 뷰어·폴더 / LIB: 원문 뷰어).
+  // 목록 행(BklThreadPanel)과 같은 훅·캐시를 쓴다.
+  const links = useSourceLinks(source);
+  if (!source) return null;
+  return <SourceQuickLinksView links={links} variant="label" className="gap-0.5" />;
 }
 
 function PanelTitleIcon({ source }: { source: BklSource | null }) {

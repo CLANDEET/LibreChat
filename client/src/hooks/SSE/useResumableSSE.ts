@@ -19,6 +19,7 @@ import type { EventHandlerParams } from './useEventHandlers';
 import { useGetStartupConfig, useGetUserBalance, queueTitleGeneration } from '~/data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import { notifyBklSourcesChanged } from '~/utils/bklSourcesEvent';
+import { cacheBklDegradedByRid, isBklDegradedEvent, promoteBklDegraded } from '~/utils/bklDegraded';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import store from '~/store';
@@ -198,7 +199,11 @@ export default function useResumableSSE(
                 firstTokenTime: _timingFirstToken,
                 endTime: _endTime,
               };
-              console.log('[ResumableSSE] Timing saved', _respMsgId, (window as any).__bklTiming[_respMsgId]);
+              console.log(
+                '[ResumableSSE] Timing saved',
+                _respMsgId,
+                (window as any).__bklTiming[_respMsgId],
+              );
 
               // Extract bkl_rid from full response text (delta detection unreliable)
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -219,7 +224,12 @@ export default function useResumableSSE(
                   _bklRid = ridFromFinal[1];
                   console.log('[ResumableSSE] Detected bkl_rid from final text:', _bklRid);
                 } else {
-                  console.log('[ResumableSSE] No bkl_rid in final. text length:', fullText.length, 'keys:', Object.keys(data.responseMessage ?? {}));
+                  console.log(
+                    '[ResumableSSE] No bkl_rid in final. text length:',
+                    fullText.length,
+                    'keys:',
+                    Object.keys(data.responseMessage ?? {}),
+                  );
                 }
               }
 
@@ -227,6 +237,7 @@ export default function useResumableSSE(
               if (_bklRid && _respMsgId) {
                 win.__bklRids = win.__bklRids ?? {};
                 win.__bklRids[_respMsgId] = _bklRid;
+                promoteBklDegraded(_bklRid, _respMsgId);
               }
 
               if (win.__bklSources[pendingKey]) {
@@ -240,9 +251,15 @@ export default function useResumableSSE(
                   .then((srcData) => {
                     win.__bklSources[_respMsgId] = srcData.sources ?? srcData;
                     notifyBklSourcesChanged();
-                    console.log('[ResumableSSE] Sources fetched for', _respMsgId, Object.keys(srcData));
+                    console.log(
+                      '[ResumableSSE] Sources fetched for',
+                      _respMsgId,
+                      Object.keys(srcData),
+                    );
                   })
-                  .catch((err) => console.error('[ResumableSSE] Failed to fetch BKL sources:', err));
+                  .catch((err) =>
+                    console.error('[ResumableSSE] Failed to fetch BKL sources:', err),
+                  );
               }
             }
             clearDraft(currentSubmission.conversation?.conversationId);
@@ -408,6 +425,12 @@ export default function useResumableSSE(
               _sourcesReplaced = true;
               notifyBklSourcesChanged();
               console.log('[ResumableSSE] Cached sources_replace for rid:', data.request_id);
+              return;
+            }
+
+            if (isBklDegradedEvent(data)) {
+              cacheBklDegradedByRid(data, _bklRid);
+              _bklRid = _bklRid ?? data.request_id ?? null;
               return;
             }
 
