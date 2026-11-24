@@ -2,6 +2,7 @@ import { TextDecoder } from 'util';
 import {
   BKL_QUERY_CHOICES_PENDING_TEXT,
   BKL_QUERY_CHOICES_READY_TEXT,
+  buildBklDeepSearchTag,
   buildBklFilterTag,
   getBklDisplayText,
   parseBklQueryChoices,
@@ -33,6 +34,17 @@ describe('bklFilter', () => {
       configurable: true,
       value: originalTextDecoder,
     });
+  });
+
+  it('builds and strips the deep search tag so it never shows in the bubble', () => {
+    expect(buildBklDeepSearchTag(true)).toBe('[BKL_DEEP_SEARCH:on]');
+    expect(buildBklDeepSearchTag(false)).toBe('');
+    expect(buildBklDeepSearchTag(null)).toBe('');
+    // 딥 서치 + 쿼리 강화 + 필터가 겹쳐도 전부 벗겨진다 (useSubmitMessage 결합 순서)
+    const stacked =
+      '[BKL_DEEP_SEARCH:on][BKL_QUERY_ENHANCE:on][BKL_FILTER:{"date_from":"2024-01-01"}] 계약 해지 사유';
+    expect(stripBklTags(stacked)).toBe('계약 해지 사유');
+    expect(getBklDisplayText('[BKL_DEEP_SEARCH:on] 질문')).toBe('질문');
   });
 
   it('strips BKL query choices control tags from display text', () => {

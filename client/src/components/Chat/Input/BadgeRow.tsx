@@ -23,6 +23,7 @@ import BklCollectionSelect from './BklCollectionSelect';
 import MCPSelect from './MCPSelect';
 import WebSearch from './WebSearch';
 import QueryEnhance from './QueryEnhance';
+import DeepSearch from './DeepSearch';
 import store from '~/store';
 
 interface BadgeRowProps {
@@ -372,6 +373,7 @@ function BadgeRow({
         )}
         {showEphemeralBadges === true && (
           <>
+            <DeepSearch />
             <WebSearch />
             <QueryEnhance />
             <BklCollectionSelect />

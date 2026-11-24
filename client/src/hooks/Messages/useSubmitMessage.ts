@@ -6,6 +6,7 @@ import { useAuthContext } from '~/hooks/AuthContext';
 import {
   buildBklFilterTag,
   buildBklQueryEnhanceTag,
+  buildBklDeepSearchTag,
   buildBklReferenceTag,
 } from '~/utils/bklFilter';
 import { clearDraftNow } from '~/utils';
@@ -21,6 +22,7 @@ export default function useSubmitMessage() {
   const autoSendPrompts = useRecoilValue(store.autoSendPrompts);
   const periodFilter = useRecoilValue(store.periodFilter);
   const queryEnhance = useRecoilValue(store.queryEnhanceEnabled);
+  const deepSearch = useRecoilValue(store.deepSearchEnabled);
   const setQueryEnhance = useSetRecoilState(store.queryEnhanceEnabled);
   const filterMatters = useRecoilValue(store.filterBklMatters);
   const filterDocs = useRecoilValue(store.filterBklDocs);
@@ -57,7 +59,8 @@ export default function useSubmitMessage() {
        * 있으면 토글 대신 overrideQueryEnhance 로 바로 강화 제출된다. */
       const enhanceOn = queryEnhance || data.overrideQueryEnhance === true;
       const enhanceTag = buildBklQueryEnhanceTag(enhanceOn);
-      const text = `${enhanceTag}${filterTag}${referenceTag}${data.text}`;
+      const deepSearchTag = buildBklDeepSearchTag(deepSearch);
+      const text = `${deepSearchTag}${enhanceTag}${filterTag}${referenceTag}${data.text}`;
 
       ask(
         {
@@ -94,6 +97,7 @@ export default function useSubmitMessage() {
       latestMessage,
       periodFilter,
       queryEnhance,
+      deepSearch,
       setQueryEnhance,
       filterMatters,
       filterDocs,
