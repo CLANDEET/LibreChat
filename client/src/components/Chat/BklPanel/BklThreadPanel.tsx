@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRecoilValue, useSetRecoilState } from 'recoil';
-import { ChevronDown, ChevronRight, ExternalLink, FileText, FolderPlus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, FolderPlus, X } from 'lucide-react';
 import type { ProjectDocumentInput } from '~/data-provider/Projects';
 import store from '~/store';
 import { cn, FileTypeIcon } from '~/utils';
 import BklSourcesPanel from '~/components/Chat/Messages/Content/BklSourcesPanel';
 import AddToProjectPopover from '~/components/Projects/AddToProjectPopover';
 import type { BklSource } from '~/components/Chat/Messages/Content/ChunkModal';
+import SourceQuickLinks from '~/components/Chat/Messages/Content/SourceQuickLinks';
 import {
   useConversationCitations,
   type CitedTurn,
@@ -308,10 +309,9 @@ function FileRow({
         <span className="rounded bg-surface-secondary px-1.5 py-0.5 text-[11px] text-text-secondary">
           {file.count}
         </span>
-        {clickable ? (
-          <ExternalLink size={13} className="shrink-0 text-text-tertiary" aria-hidden="true" />
-        ) : null}
       </button>
+      {/* 코퍼스별 3단 링크 (iM 뷰어 · iM 폴더 · BIMS) — 행 클릭과 분리 */}
+      <SourceQuickLinks source={file.sample} viewerFallback={file.imanageUrl} />
     </div>
   );
 }
@@ -349,23 +349,8 @@ function TurnGroup({
                 <span className="shrink-0 text-[11px] text-text-tertiary">{String(pageInfo)}</span>
               ) : null}
             </button>
-            {/* 파일 행과 같은 iManage 원문 열기 — 행 클릭(청크 뷰)과 분리된 별도 버튼 */}
-            {chunk.imanageUrl ? (
-              <button
-                type="button"
-                aria-label={`${chunk.fileName} iManage 원문 열기`}
-                title="iManage 원문 열기"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(chunk.imanageUrl as string, '_blank', 'noopener');
-                }}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-tertiary hover:bg-surface-tertiary hover:text-text-primary"
-              >
-                <ExternalLink size={13} aria-hidden="true" />
-              </button>
-            ) : (
-              <span className="h-7 w-7 shrink-0" aria-hidden="true" />
-            )}
+            {/* 청크를 열지 않고도 바로 — iM 뷰어 · iM 폴더 · BIMS (코퍼스별, 2026-11-24) */}
+            <SourceQuickLinks source={chunk.source} viewerFallback={chunk.imanageUrl} />
           </div>
         );
       })}

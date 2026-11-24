@@ -15,6 +15,7 @@ import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { notifyBklSourcesChanged } from '~/utils/bklSourcesEvent';
+import { cacheBklDegradedByRid, isBklDegradedEvent, promoteBklDegraded } from '~/utils/bklDegraded';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import store from '~/store';
@@ -125,7 +126,8 @@ export default function useSSE(
       if (data.final != null) {
         const endTime = Date.now();
         const responseMessageId: string | undefined =
-          data.responseMessage?.messageId ?? (data.final as Record<string, unknown>)?.messageId as string | undefined;
+          data.responseMessage?.messageId ??
+          ((data.final as Record<string, unknown>)?.messageId as string | undefined);
         if (responseMessageId) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__bklTiming = (window as any).__bklTiming ?? {};
@@ -142,6 +144,8 @@ export default function useSSE(
             const win = window as any;
             win.__bklRids = win.__bklRids ?? {};
             win.__bklRids[responseMessageId] = bklRequestId;
+            // 일부 검색 플로우 누락(degraded) 이벤트도 messageId 로 이관.
+            promoteBklDegraded(bklRequestId, responseMessageId);
 
             // If `sources_replace` SSE already delivered the full source list,
             // copy it into the messageId-keyed dict so the citation drawer can
@@ -219,6 +223,14 @@ export default function useSSE(
           // 이게 없으면 final 에서 rid 가 없다는 이유로 messageId 캐시 이관이
           // 통째로 스킵돼 전문 읽기 인용이 빈 출처로 남는다.
           bklRequestId = bklRequestId ?? data.request_id;
+          return;
+        }
+
+        if (isBklDegradedEvent(data)) {
+          // 서버가 일부 검색 범위(도서관·DB 등) 타임아웃을 알림 — 본문에 섞지
+          // 않고 캐시만 해 두고 final 에서 messageId 로 이관한다.
+          cacheBklDegradedByRid(data, bklRequestId);
+          bklRequestId = bklRequestId ?? data.request_id ?? null;
           return;
         }
 

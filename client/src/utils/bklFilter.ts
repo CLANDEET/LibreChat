@@ -5,6 +5,7 @@ import type {
   ExtensionGroup,
   LibraryFilter,
 } from '~/store/filters';
+import { humanizeBklMarkers } from './bklErrors';
 
 const BKL_RID_RE = /<!-- bkl_rid:([a-zA-Z0-9_-]+) -->/;
 
@@ -200,7 +201,7 @@ export const getBklDisplayText = (text: string | null | undefined): string => {
   if (BKL_QUERY_CHOICES_PARTIAL_RE.test(text)) {
     return BKL_QUERY_CHOICES_PENDING_TEXT;
   }
-  return stripDoubleMdForDisplay(stripBklTags(text));
+  return humanizeBklMarkers(stripDoubleMdForDisplay(stripBklTags(text)));
 };
 
 export interface BklQueryCandidate {

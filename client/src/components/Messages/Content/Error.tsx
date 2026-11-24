@@ -1,8 +1,10 @@
 // file deepcode ignore HardcodedNonCryptoSecret: No hardcoded secrets
+import { useState } from 'react';
 import { ViolationTypes, ErrorTypes, alternateName } from 'librechat-data-provider';
 import type { LocalizeFunction } from '~/common';
 import { formatJSON, extractJson, isJson } from '~/utils/json';
 import { useLocalize } from '~/hooks';
+import { classifyBklError, type BklClassifiedError } from '~/utils/bklErrors';
 import CodeBlock from './CodeBlock';
 
 const localizedErrorPrefix = 'com_error';
@@ -122,14 +124,54 @@ const errorMessages = {
   },
 };
 
+/**
+ * BKL: 유형화된 한글 오류 안내 — raw `502 Bad Gateway` / 내부 메시지 대신
+ * 코드표(utils/bklErrors) 의 제목·안내문 + 요청 ID 를 보여준다. 원문은
+ * "자세히" 토글 뒤에 둔다 (관리자 문의 시 복사용).
+ */
+export function BklErrorNotice({ error }: { error: BklClassifiedError }) {
+  const [showRaw, setShowRaw] = useState(false);
+  const { spec, requestId, raw } = error;
+  return (
+    <div data-testid="bkl-error-notice" data-code={spec.code} className="flex flex-col gap-1">
+      <div className="font-semibold">{spec.title}</div>
+      <div>{spec.message}</div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-80">
+        <span>
+          오류 코드: <code>{spec.code}</code>
+        </span>
+        {requestId ? (
+          <span>
+            요청 ID: <code data-testid="bkl-error-rid">{requestId}</code>
+          </span>
+        ) : null}
+        {raw ? (
+          <button
+            type="button"
+            onClick={() => setShowRaw((v) => !v)}
+            className="underline underline-offset-2 hover:opacity-100"
+          >
+            {showRaw ? '원문 숨기기' : '자세히'}
+          </button>
+        ) : null}
+      </div>
+      {showRaw && raw ? (
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-black/5 p-2 text-[11px] dark:bg-white/5">
+          {raw.length > 1200 ? raw.slice(0, 1200) + '…' : raw}
+        </pre>
+      ) : null}
+    </div>
+  );
+}
+
 const Error = ({ text }: { text: string }) => {
   const localize = useLocalize();
   const jsonString = extractJson(text);
-  const errorMessage = text.length > 512 && !jsonString ? text.slice(0, 512) + '...' : text;
-  const defaultResponse = `Something went wrong. Here's the specific error message we encountered: ${errorMessage}`;
 
   if (!isJson(jsonString)) {
-    return defaultResponse;
+    // BKL: 마커 `[BKL:CODE:rid]` 또는 휴리스틱으로 유형화 — 영문 raw 문구 대신
+    // 한글 안내 + 요청 ID.
+    return <BklErrorNotice error={classifyBklError(text)} />;
   }
 
   const json = JSON.parse(jsonString);
@@ -143,7 +185,12 @@ const Error = ({ text }: { text: string }) => {
   } else if (keyExists) {
     return errorMessages[errorKey];
   } else {
-    return defaultResponse;
+    // LibreChat 코드표에 없는 JSON (bkl-api 봉투 `{error:{code,…}}` 포함)
+    const hasBklEnvelope =
+      json &&
+      typeof json === 'object' &&
+      (json.error?.code || json.request_id || json.error?.request_id);
+    return <BklErrorNotice error={classifyBklError(hasBklEnvelope ? json : text)} />;
   }
 };
 
