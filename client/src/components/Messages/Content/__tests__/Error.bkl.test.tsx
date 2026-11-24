@@ -3,7 +3,7 @@
  * 한글 안내 + 오류 코드 + 요청 ID. LibreChat 자체 코드표(JSON) 경로는 그대로.
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import Error from '../Error';
 
 jest.mock('~/hooks', () => ({
@@ -11,7 +11,7 @@ jest.mock('~/hooks', () => ({
 }));
 
 describe('Error — BKL 유형화', () => {
-  it('마커가 있는 스트림 오류 → 한글 안내 + 요청 ID, 원문은 토글 뒤로', () => {
+  it('마커가 있는 스트림 오류 → 한글 안내 + 요청 ID, 영문 원문은 어디에도 없음', () => {
     render(
       <Error text="An error occurred while processing the request: upstream 502 Bad Gateway [BKL:SERVICE_UNAVAILABLE:req_42]" />,
     );
@@ -21,8 +21,29 @@ describe('Error — BKL 유형화', () => {
     expect(screen.getByTestId('bkl-error-rid')).toHaveTextContent('req_42');
     expect(screen.queryByText(/An error occurred while processing/)).toBeNull();
     expect(screen.queryByText(/502 Bad Gateway/)).toBeNull();
-    fireEvent.click(screen.getByText('자세히'));
-    expect(screen.getByText(/502 Bad Gateway/)).toBeInTheDocument();
+    expect(screen.queryByText('자세히')).toBeNull();
+  });
+
+  it('봉투의 detail 은 렌더에 쓰지 않는다 (5xx 원문 비노출 계약)', () => {
+    render(
+      <Error
+        text={JSON.stringify({
+          error: {
+            code: 'EMBEDDING_UNAVAILABLE',
+            message: '검색 엔진 일시 오류입니다. [BKL:EMBEDDING_UNAVAILABLE:rid-5]',
+            request_id: 'rid-5',
+            retryable: true,
+          },
+          detail: 'models/qwen3-embedding is not found for API version v1beta',
+        })}
+      />,
+    );
+    expect(screen.getByTestId('bkl-error-notice')).toHaveAttribute(
+      'data-code',
+      'EMBEDDING_UNAVAILABLE',
+    );
+    expect(screen.getByTestId('bkl-error-rid')).toHaveTextContent('rid-5');
+    expect(screen.queryByText(/qwen3/)).toBeNull();
   });
 
   it('마커 없는 raw 505 도 한글로 매핑된다', () => {

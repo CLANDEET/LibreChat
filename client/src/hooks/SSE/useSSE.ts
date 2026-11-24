@@ -106,9 +106,16 @@ export default function useSSE(
     const streamTiming = { startTime: Date.now(), firstTokenTime: null as number | null };
     let bklRequestId: string | null = null;
 
+    // BKL: 요청마다 추적 ID — 서버(LibreChat api)가 ai-api 로 X-Request-Id 로 넘겨
+    // 스트림 열리기 전 오류(모델명 오류 등)도 요청 ID 를 갖게 한다.
+    const clientRequestId = v4();
     const sse = new SSE(payloadData.server, {
       payload: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'X-BKL-Request-Id': clientRequestId,
+      },
     });
 
     sse.addEventListener('attachment', (e: MessageEvent) => {

@@ -153,7 +153,7 @@ export type BklClassifiedError = {
   requestId: string | null;
   /** 마커가 있었는지 (서버가 직접 분류) vs 휴리스틱 매핑 */
   fromMarker: boolean;
-  /** 마커·프리픽스를 뗀 원문 (디버그 토글용) */
+  /** 마커·프리픽스를 뗀 원문 — 분류 입력 보존용. 화면에는 렌더하지 않는다. */
   raw: string;
 };
 
@@ -238,7 +238,9 @@ export function classifyBklError(input: unknown): BklClassifiedError {
       fromMarker = true;
     }
     if (typeof err.request_id === 'string') requestId = err.request_id;
-    text = String(err.message ?? obj.detail ?? obj.message ?? '');
+    // 렌더링 계약: 본문은 error.message 만. `detail` 은 하위 호환 필드라 쓰지 않는다
+    // (5xx 에선 서버가 "internal error" 로 가리지만, 프런트도 의존하지 않는다).
+    text = String(err.message ?? obj.message ?? '');
   } else {
     text = String(input ?? '');
   }

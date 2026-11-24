@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { IUser } from '@librechat/data-schemas';
 
 /**
@@ -35,6 +36,31 @@ export type BklUser = Partial<IUser> & {
 /** Minimal request shape — anything carrying an authenticated `user`. */
 export interface BklIdentityRequest {
   user?: BklUser | null;
+  /** Incoming request headers (Express `req.headers`) — used for the client request id. */
+  headers?: Record<string, string | string[] | undefined>;
+}
+
+/**
+ * Per-request trace id forwarded to the ai-api as `X-Request-Id`.
+ *
+ * The ai-api reads `x-request-id` (`src/api/main.py::_request_id_of`) and puts it
+ * into the error envelope / `[BKL:CODE:rid]` marker. Errors that happen *before*
+ * the SSE stream opens (unknown model, validation) have no server-side
+ * request_id otherwise, so the id must come from this side. The browser sends
+ * `X-BKL-Request-Id` on the chat POST; when it is missing or malformed a UUID
+ * is minted here so every outbound ai-api call is still traceable.
+ */
+export const BKL_REQUEST_ID_HEADER = 'X-Request-Id';
+const CLIENT_REQUEST_ID_HEADER = 'x-bkl-request-id';
+const REQUEST_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
+export function bklRequestId(req?: BklIdentityRequest | null): string {
+  const raw = req?.headers?.[CLIENT_REQUEST_ID_HEADER];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value === 'string' && REQUEST_ID_RE.test(value.trim())) {
+    return value.trim();
+  }
+  return randomUUID();
 }
 
 /** Header name constants kept in one place to avoid drift across call sites. */
@@ -136,9 +162,10 @@ export function withBklIdentityHeaders(
   }
 
   const identity = bklIdentityHeaders(req);
+  const requestId = { [BKL_REQUEST_ID_HEADER]: bklRequestId(req) };
   if (Object.keys(identity).length === 0) {
-    return headers;
+    return { ...headers, ...requestId };
   }
 
-  return { ...headers, ...identity };
+  return { ...headers, ...identity, ...requestId };
 }
