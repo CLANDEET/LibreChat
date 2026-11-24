@@ -12,11 +12,12 @@
  */
 export type LibraryFilter = 'all' | 'matter' | 'knowledge' | 'booklib';
 
-export const LIBRARY_FILTER_OPTIONS: { id: LibraryFilter; label: string }[] = [
-  { id: 'all', label: '전체' },
-  { id: 'matter', label: 'M 라이브러리' },
-  { id: 'knowledge', label: 'DB 라이브러리' },
-  { id: 'booklib', label: '도서관' },
+/** `label` 은 문서검색 FilterBar·활성 칩용, `short` 는 채팅 드롭다운(4칸 한 줄)용. */
+export const LIBRARY_FILTER_OPTIONS: { id: LibraryFilter; label: string; short: string }[] = [
+  { id: 'all', label: '전체', short: '전체' },
+  { id: 'matter', label: 'M 라이브러리', short: 'M' },
+  { id: 'knowledge', label: 'DB 라이브러리', short: 'DB' },
+  { id: 'booklib', label: '도서관', short: '도서관' },
 ];
 
 export function libraryFilterLabel(value: string | null | undefined): string {
