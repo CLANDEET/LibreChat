@@ -6,7 +6,7 @@ import store from '~/store';
 import { cn } from '~/utils';
 
 /**
- * BKL: 상단 안내 banner — BKL Prism 의 초기 테스트 상태와 검색 범위 한정 명시.
+ * BKL: 상단 안내 banner — BKL Prism 정식 출시 예정 안내와 검색 범위(2026.09.30 까지 종결 사건) 명시.
  *
  *   디자인:
  *     - 단색 amber tint (그라데이션 없음 — 사용자 피드백). 좌측 Info 아이콘 + 본문 + 우측 X.
@@ -45,15 +45,15 @@ export default function BklTopBanner() {
           aria-hidden="true"
         />
         <div className="min-w-0 flex-1 text-xs leading-relaxed sm:text-sm">
-          <p className="font-semibold">BKL Prism 베타 서비스 안내</p>
+          <p className="font-semibold">BKL Prism 서비스 안내</p>
           <div className="mt-0.5 text-amber-800 dark:text-amber-200">
             <p>
-              현재 본 서비스는 베타 서비스 단계이며,{' '}
-              <span className="font-bold underline">2019.06.30 ~ 2026.09.30 7개년 종결 사건</span>
+              본 서비스는 정식 출시를 앞두고 있으며,{' '}
+              <span className="font-bold underline">2026년 9월 말(2026.09.30)까지 종결된 사건</span>
               에 한해 검색이 제공됩니다.
             </p>
             <p className="mt-0.5 sm:mt-0">
-              그 외 자료는 검색 결과에서 누락될 수 있으며, 검색가능 기간이 추가되면 본 공지를 통해 안내드릴 예정입니다.
+              그 이후 종결 사건 및 진행 중 사건 자료는 검색 결과에서 누락될 수 있으며, 검색 가능 기간이 갱신되면 본 공지를 통해 안내드릴 예정입니다.
             </p>
           </div>
         </div>
@@ -64,7 +64,7 @@ export default function BklTopBanner() {
             e.stopPropagation();
             setDismissed(true);
           }}
-          aria-label="베타 서비스 안내 닫기"
+          aria-label="서비스 안내 닫기"
           title="닫기"
           className={cn(
             'relative z-10 -mr-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md self-center',
