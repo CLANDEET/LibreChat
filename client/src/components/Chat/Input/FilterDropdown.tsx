@@ -435,7 +435,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
           <div
             role="radiogroup"
             aria-label="라이브러리 선택"
-            className="grid grid-cols-3 gap-1 rounded-xl bg-surface-secondary p-1"
+            className="grid grid-cols-4 gap-1 rounded-xl bg-surface-secondary p-1"
           >
             {LIBRARY_OPTIONS.map((opt) => {
               const selected = (periodFilter.library ?? 'all') === opt.id;
@@ -452,7 +452,7 @@ const FilterDropdown = ({ disabled }: FilterDropdownProps) => {
                     selected && 'bg-surface-primary text-text-primary shadow-sm',
                   )}
                 >
-                  {opt.label}
+                  {opt.short}
                 </button>
               );
             })}

@@ -177,7 +177,7 @@ describe('FilterDropdown — 필터 하나를 걸면 팝업이 닫힌다', () =>
   it('검색 범위(라이브러리) 선택', async () => {
     mount();
     openMenu();
-    fireEvent.click(screen.getByRole('radio', { name: 'M 라이브러리' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'M' }));
     await waitFor(() => expect(isOpen()).toBe(false));
   });
 
