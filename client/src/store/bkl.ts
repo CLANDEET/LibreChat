@@ -31,6 +31,41 @@ export const queryEnhanceEnabled = atom<boolean>({
   ],
 });
 
+/**
+ * 딥 서치 배지 — 켜면 질의 앞에 `[BKL_DEEP_SEARCH:on]` 이 붙어 서버가 재검색
+ * 상한을 4회로 올린다 (기본 2회). 쿼리 강화와 같은 방식으로 localStorage 에
+ * 유지되므로, 한 번 켜 두면 새로고침 후에도 모든 질의가 딥 서치로 나간다 —
+ * 배지 강조(isCheckedClassName) 로 상태를 항상 보이게 한다.
+ */
+const DEEP_SEARCH_STORAGE_KEY = 'bkl_deep_search_enabled';
+
+const readDeepSearchInitial = (): boolean => {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    return localStorage.getItem(DEEP_SEARCH_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const deepSearchEnabled = atom<boolean>({
+  key: 'bklDeepSearchEnabled',
+  default: readDeepSearchInitial(),
+  effects: [
+    ({ onSet }) => {
+      onSet((newValue) => {
+        if (typeof localStorage === 'undefined') return;
+        try {
+          if (newValue) localStorage.setItem(DEEP_SEARCH_STORAGE_KEY, '1');
+          else localStorage.removeItem(DEEP_SEARCH_STORAGE_KEY);
+        } catch {
+          // noop
+        }
+      });
+    },
+  ],
+});
+
 export interface BklMatterSelection {
   matter_uid: string;
   label: string;

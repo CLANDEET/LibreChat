@@ -148,6 +148,10 @@ export const buildBklFilterTag = (
 export const buildBklQueryEnhanceTag = (enabled: boolean | null | undefined): string =>
   enabled ? '[BKL_QUERY_ENHANCE:on]' : '';
 
+/** 딥 서치 배지 — 서버 재검색 상한 4회 (기본 2회). */
+export const buildBklDeepSearchTag = (enabled: boolean | null | undefined): string =>
+  enabled ? '[BKL_DEEP_SEARCH:on]' : '';
+
 export const buildBklReferenceTag = (matterUids?: string[] | null): string => {
   if (!matterUids || matterUids.length === 0) return '';
   const s = matterUids.join(',');
@@ -156,7 +160,7 @@ export const buildBklReferenceTag = (matterUids?: string[] | null): string => {
 };
 
 const BKL_TAG_RE =
-  /^(?:\[BKL_FILTER:\{.*?\}\]|\[BKL_REFERENCE:\{.*?\}\]|\[BKL_GUIDED_RETRY:[A-Za-z0-9_-]+\]|\[BKL_QUERY_ENHANCE:on\]|\[BKL_QUERY_CHOICES:[A-Za-z0-9+/=]+\])\s*/;
+  /^(?:\[BKL_FILTER:\{.*?\}\]|\[BKL_REFERENCE:\{.*?\}\]|\[BKL_GUIDED_RETRY:[A-Za-z0-9_-]+\]|\[BKL_QUERY_ENHANCE:on\]|\[BKL_DEEP_SEARCH:on\]|\[BKL_QUERY_CHOICES:[A-Za-z0-9+/=]+\])\s*/;
 const BKL_QUERY_CHOICES_COMPLETE_RE = /^\[BKL_QUERY_CHOICES:[A-Za-z0-9+/=]+\]\s*$/;
 const BKL_QUERY_CHOICES_PARTIAL_RE = /^\[BKL_QUERY_CHOICES:[A-Za-z0-9+/=]*$/;
 export const BKL_QUERY_CHOICES_READY_TEXT =

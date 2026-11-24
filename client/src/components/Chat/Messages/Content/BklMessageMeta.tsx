@@ -8,6 +8,7 @@ import {
   Library,
   Search,
   Sparkles,
+  Telescope,
 } from 'lucide-react';
 import type { TMessage } from 'librechat-data-provider';
 import type { ReactNode } from 'react';
@@ -26,6 +27,7 @@ interface BklMeta {
   fileNameContains?: string;
   referenceMatterUids?: string[];
   queryEnhanced?: boolean;
+  deepSearch?: boolean;
 }
 
 const parseBklMeta = (text: string | null | undefined): BklMeta | null => {
@@ -91,6 +93,11 @@ const parseBklMeta = (text: string | null | undefined): BklMeta | null => {
 
   if (/\[BKL_QUERY_ENHANCE:on\]/.test(text)) {
     meta.queryEnhanced = true;
+    found = true;
+  }
+
+  if (/\[BKL_DEEP_SEARCH:on\]/.test(text)) {
+    meta.deepSearch = true;
     found = true;
   }
 
@@ -224,6 +231,17 @@ export default function BklMessageMeta({ message }: { message?: TMessage }) {
         key="ref-matter"
         icon={<AtSign className="h-3 w-3 shrink-0 text-text-tertiary" aria-hidden="true" />}
         label={`참조: ${resolveMatterLabels(meta.referenceMatterUids)}`}
+      />,
+    );
+  }
+
+  if (meta.deepSearch) {
+    chips.push(
+      <Chip
+        key="deep"
+        icon={<Telescope className="h-3 w-3 shrink-0 text-amber-600" aria-hidden="true" />}
+        label="딥 서치"
+        className="border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
       />,
     );
   }
