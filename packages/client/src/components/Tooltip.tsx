@@ -84,18 +84,18 @@ export const TooltipAnchor = forwardRef<HTMLDivElement, TooltipAnchorProps>(func
       <AnimatePresence>
         {mounted === true && (
           <Ariakit.Tooltip
-            gutter={4}
+            gutter={8}
             alwaysVisible
             className="tooltip"
             render={
               <motion.div
-                initial={{ opacity: 0, x, y }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                exit={{ opacity: 0, x, y }}
+                initial={{ opacity: 0, x, y, scale: 0.96 }}
+                animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                exit={{ opacity: 0, x, y, scale: 0.96 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
               />
             }
           >
-            <Ariakit.TooltipArrow />
             {enableHTML ? (
               <div
                 dangerouslySetInnerHTML={{
