@@ -7,6 +7,10 @@ import store from '~/store';
 export const DEEP_SEARCH_TOOLTIP =
   '딥 서치 — 자료를 더 넓게 다시 찾아봅니다. 답변까지 최대 5분 정도 걸릴 수 있습니다.';
 
+/** 툴팁 표시용 — 제목(굵게) + 설명 두 줄. 문구 자체는 DEEP_SEARCH_TOOLTIP 과 동일. */
+const DEEP_SEARCH_TOOLTIP_HTML =
+  '<strong>딥 서치</strong>자료를 더 넓게 다시 찾아봅니다.<br/>답변까지 최대 5분 정도 걸릴 수 있습니다.';
+
 /**
  * 딥 서치 배지 (QueryEnhance 와 같은 패턴). 켜져 있으면 useSubmitMessage 가
  * 질의 앞에 `[BKL_DEEP_SEARCH:on]` 을 붙이고, 서버는 재검색 상한을 4회로 올린다.
@@ -23,7 +27,8 @@ function DeepSearch() {
 
   return (
     <TooltipAnchor
-      description={DEEP_SEARCH_TOOLTIP}
+      description={DEEP_SEARCH_TOOLTIP_HTML}
+      enableHTML
       side="top"
       render={<span className="inline-flex max-w-fit" data-testid="bkl-deep-search-badge" />}
     >
