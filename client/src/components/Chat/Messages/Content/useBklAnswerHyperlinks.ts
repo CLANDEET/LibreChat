@@ -159,6 +159,15 @@ export function parseHyperlinksResponse(json: HyperlinksResponse | null): RidMap
     : null;
 }
 
+/**
+ * 공유 열람(ShareView) 등 서버를 부르지 못하는 경로가 미리 받아 둔 지도를
+ * 캐시에 넣는다. 이후 같은 rid 의 답변은 fetch 없이 바로 링크가 걸린다.
+ */
+export function primeHyperlinkMapCache(rid: string, mapping: Record<string, unknown> | null): void {
+  if (!rid) return;
+  ridMapCache.set(rid, parseHyperlinksResponse(mapping ? { mapping } : null));
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => window.setTimeout(r, ms));
 
 async function fetchHyperlinkMap(rid: string): Promise<RidMaps | null> {

@@ -66,15 +66,59 @@ function ThreadOverview() {
   const { conversationId } = useParams();
   const { turns, files, isLoading } = useConversationCitations(conversationId);
   const openChunk = useOpenBklSource();
+  return (
+    <ThreadOverviewView
+      turns={turns}
+      files={files}
+      isLoading={isLoading}
+      onOpenChunk={openChunk}
+      resetKey={conversationId ?? ''}
+    />
+  );
+}
+
+export type ThreadOverviewViewProps = {
+  turns: CitedTurn[];
+  files: MentionedFile[];
+  isLoading: boolean;
+  onOpenChunk: (messageId: string, n: number) => void;
+  /** 바뀌면 다중 선택을 비운다 (채팅: 대화 id). */
+  resetKey?: string;
+  /**
+   * 공유 열람 등 로그인 없는 화면 — 프로젝트 담기(체크박스·선택 바)를 숨기고
+   * 링크·청크 열람만 남긴다.
+   */
+  readOnly?: boolean;
+  /** 헤더 제목 (기본 "대화 자료"). */
+  title?: string;
+};
+
+/**
+ * Overview 의 표현부 — 데이터는 props 로 받는다. 채팅은 ThreadOverview 가
+ * 훅으로, 공유 열람(ShareSourcesPanel)은 스냅샷으로 채운다.
+ */
+export function ThreadOverviewView({
+  turns,
+  files,
+  isLoading,
+  onOpenChunk,
+  resetKey = '',
+  readOnly = false,
+  title = '대화 자료',
+}: ThreadOverviewViewProps) {
+  const openChunk = onOpenChunk;
 
   // BKL: 언급된 파일 다중 선택 → 프로젝트에 한 번에 담기 (문서검색 화면과 동일 UX).
   // 대화가 바뀌면 선택을 비운다. 파일 목록이 줄어 사라진 키는 파생값에서 걸러진다.
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   useEffect(() => {
     setSelectedKeys(new Set());
-  }, [conversationId]);
+  }, [resetKey]);
 
-  const selectableKeys = useMemo(() => files.filter((f) => f.docId).map((f) => f.key), [files]);
+  const selectableKeys = useMemo(
+    () => (readOnly ? [] : files.filter((f) => f.docId).map((f) => f.key)),
+    [files, readOnly],
+  );
   const allSelected =
     selectableKeys.length > 0 && selectableKeys.every((key) => selectedKeys.has(key));
   const toggleSelection = useCallback((key: string) => {
@@ -99,7 +143,7 @@ function ThreadOverview() {
   return (
     <div className="flex h-full w-full flex-col bg-surface-primary text-text-primary">
       <div className="flex flex-shrink-0 items-center gap-2 border-b border-border-light bg-surface-primary-alt px-4 py-3">
-        <h2 className="truncate text-sm font-semibold text-text-primary">대화 자료</h2>
+        <h2 className="truncate text-sm font-semibold text-text-primary">{title}</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -144,7 +188,10 @@ function ThreadOverview() {
                   key={file.key}
                   file={file}
                   isSelected={selectedKeys.has(file.key)}
-                  onToggleSelect={file.docId ? () => toggleSelection(file.key) : undefined}
+                  onToggleSelect={
+                    !readOnly && file.docId ? () => toggleSelection(file.key) : undefined
+                  }
+                  hideSelectColumn={readOnly}
                 />
               ))}
             </PanelSection>
@@ -264,10 +311,13 @@ function FileRow({
   file,
   isSelected,
   onToggleSelect,
+  hideSelectColumn = false,
 }: {
   file: MentionedFile;
   isSelected: boolean;
   onToggleSelect?: () => void;
+  /** 읽기 전용(공유 열람) — 체크박스 칸 자체를 두지 않는다. */
+  hideSelectColumn?: boolean;
 }) {
   const rawName = String(
     file.sample.metadata?.[0]?.name ?? file.sample.metadata?.[0]?.file_name ?? file.fileName,
@@ -276,6 +326,20 @@ function FileRow({
   const open = () => {
     if (file.imanageUrl) window.open(file.imanageUrl, '_blank', 'noopener');
   };
+  let selectColumn: React.ReactNode = null;
+  if (!hideSelectColumn) {
+    selectColumn = onToggleSelect ? (
+      <input
+        type="checkbox"
+        aria-label={`${file.fileName} 선택`}
+        checked={isSelected}
+        onChange={onToggleSelect}
+        className="h-4 w-4 shrink-0 cursor-pointer accent-text-primary"
+      />
+    ) : (
+      <span className="h-4 w-4 shrink-0" aria-hidden="true" />
+    );
+  }
   return (
     <div
       className={cn(
@@ -283,17 +347,7 @@ function FileRow({
         isSelected && 'bg-surface-active-alt',
       )}
     >
-      {onToggleSelect ? (
-        <input
-          type="checkbox"
-          aria-label={`${file.fileName} 선택`}
-          checked={isSelected}
-          onChange={onToggleSelect}
-          className="h-4 w-4 shrink-0 cursor-pointer accent-text-primary"
-        />
-      ) : (
-        <span className="h-4 w-4 shrink-0" aria-hidden="true" />
-      )}
+      {selectColumn}
       <button
         type="button"
         onClick={open}

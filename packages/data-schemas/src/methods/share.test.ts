@@ -27,6 +27,8 @@ describe('Share Methods', () => {
         messages: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Message' }],
         shareId: { type: String, index: true },
         isPublic: { type: Boolean, default: true },
+        // BKL: 출처 스냅샷 (실제 schema/share.ts 와 동일)
+        bklSources: { type: mongoose.Schema.Types.Mixed, default: null },
       },
       { timestamps: true },
     );
@@ -307,6 +309,91 @@ describe('Share Methods', () => {
         expect(msg.conversationId).toBe(result.conversationId);
         expect(msg.user).toBeUndefined(); // User should be removed
       });
+    });
+
+    test('BKL: remaps bklSources snapshot message ids to the anonymized ids', async () => {
+      const userId = new mongoose.Types.ObjectId().toString();
+      const conversationId = `conv_${nanoid()}`;
+      const shareId = `share_${nanoid()}`;
+      const userMsgId = `msg_${nanoid()}`;
+      const answerId = `msg_${nanoid()}`;
+
+      const messages = await Message.create([
+        {
+          messageId: userMsgId,
+          conversationId,
+          user: userId,
+          text: '계약 해지 사유?',
+          isCreatedByUser: true,
+          parentMessageId: Constants.NO_PARENT,
+        },
+        {
+          messageId: answerId,
+          conversationId,
+          user: userId,
+          text: '해지 사유는 … [1] <!-- bkl_rid:req-abc -->',
+          isCreatedByUser: false,
+          model: 'gpt-4',
+          parentMessageId: userMsgId,
+        },
+      ]);
+
+      const hyperlinkMap = { '『계약서.docx』': '[『계약서.docx』](https://im.example/1)' };
+      await SharedLink.create({
+        shareId,
+        conversationId,
+        user: userId,
+        title: 'Snapshot Share',
+        messages: messages.map((m) => m._id),
+        isPublic: true,
+        bklSources: [
+          {
+            request_id: 'req-abc',
+            message_id: answerId,
+            created_at: '2026-11-25T00:00:00Z',
+            sources: [{ document: ['본문'], metadata: [{ doc_id: 'd1', name: '계약서.docx' }] }],
+            hyperlink_map: hyperlinkMap,
+          },
+          // 공유 범위 밖(다른 답변) — 버려진다
+          { request_id: 'req-zzz', message_id: `msg_${nanoid()}`, sources: [{ document: ['x'] }] },
+        ],
+      });
+
+      const result = await shareMethods.getSharedMessages(shareId);
+      expect(result?.bklSources).toHaveLength(1);
+      const entry = result!.bklSources![0];
+      const anonAnswer = result!.messages.find((m) => !m.isCreatedByUser)!;
+      // 원본 id 는 어디에도 남지 않고, 본문 메시지의 익명 id 와 일치한다
+      expect(entry.message_id).toBe(anonAnswer.messageId);
+      expect(entry.message_id).not.toBe(answerId);
+      expect(JSON.stringify(result)).not.toContain(answerId);
+      expect(entry.request_id).toBe('req-abc');
+      expect(entry.hyperlink_map).toEqual(hyperlinkMap);
+      expect(entry.sources).toHaveLength(1);
+      expect((entry as unknown as Record<string, unknown>).created_at).toBeUndefined();
+    });
+
+    test('BKL: bklSources is null when the link has no snapshot (legacy links)', async () => {
+      const userId = new mongoose.Types.ObjectId().toString();
+      const conversationId = `conv_${nanoid()}`;
+      const shareId = `share_${nanoid()}`;
+      const msg = await Message.create({
+        messageId: `msg_${nanoid()}`,
+        conversationId,
+        user: userId,
+        text: 'Hello',
+        isCreatedByUser: true,
+        parentMessageId: Constants.NO_PARENT,
+      });
+      await SharedLink.create({
+        shareId,
+        conversationId,
+        user: userId,
+        messages: [msg._id],
+        isPublic: true,
+      });
+      const result = await shareMethods.getSharedMessages(shareId);
+      expect(result?.bklSources).toBeNull();
     });
 
     test('should return null for non-public share', async () => {

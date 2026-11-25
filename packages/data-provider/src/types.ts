@@ -300,8 +300,18 @@ export type TArchiveConversationRequest = {
 
 export type TArchiveConversationResponse = TConversation;
 
+/** BKL: 공유 응답에 실리는 답변 1건의 출처 스냅샷 (message_id 는 익명 id). */
+export type TBklShareSourceEntry = {
+  request_id?: string | null;
+  message_id: string;
+  sources: unknown[];
+  hyperlink_map?: Record<string, unknown> | null;
+};
+
 export type TSharedMessagesResponse = Omit<TSharedLink, 'messages'> & {
   messages: TMessage[];
+  /** BKL: 공유 시점 출처 스냅샷 — 없으면(구 링크) 본문만 표시 */
+  bklSources?: TBklShareSourceEntry[] | null;
 };
 
 export type TCreateShareLinkRequest = Pick<TConversation, 'conversationId'>;

@@ -11,6 +11,7 @@ const {
 } = require('~/models');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
 const { SharedLink } = require('~/db/models');
+const { snapshotBklChatSources } = require('~/server/services/bklChatSources');
 const mongoose = require('mongoose');
 const router = express.Router();
 
@@ -144,6 +145,24 @@ router.post('/:conversationId', requireJwtAuth, async (req, res) => {
           );
         } catch (err) {
           logger.warn('[share] failed to set default expiry', err);
+        }
+      }
+      /**
+       * BKL: 출처 스냅샷 — 공유 열람자는 로그인 없이 보므로 ai-api 를 직접
+       * 부를 수 없다. 생성 시점의 출처·하이퍼링크 지도를 링크에 저장해 둔다.
+       * 반드시 원본 conversationId (req.params) 를 쓴다. 실패해도 공유는 성공.
+       */
+      if (created.shareId) {
+        try {
+          const snapshot = await snapshotBklChatSources(req.params.conversationId);
+          if (snapshot) {
+            await SharedLink.updateOne(
+              { shareId: created.shareId },
+              { $set: { bklSources: snapshot } },
+            );
+          }
+        } catch (err) {
+          logger.warn('[share] failed to snapshot sources', err);
         }
       }
       res.status(200).json(created);
