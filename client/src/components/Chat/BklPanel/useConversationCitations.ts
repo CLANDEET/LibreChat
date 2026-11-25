@@ -190,6 +190,85 @@ function useStreamingSourcesTick(): number {
   return tick;
 }
 
+export type CitationAggregate = {
+  turns: CitedTurn[];
+  files: MentionedFile[];
+};
+
+/**
+ * 답변 메시지 + (messageId → 출처 배열) 에서 패널 데이터를 만든다 — 순수 함수.
+ * 채팅(useConversationCitations)과 공유 열람(ShareSourcesPanel)이 같은 집계를
+ * 쓰도록 분리했다. 출처 조회 순서(API → 스트리밍 캐시 → localStorage)는
+ * `resolveSources` 로 주입한다.
+ */
+export function aggregateCitations(
+  messages: readonly TMessage[] | undefined,
+  resolveSources: (messageId: string) => BklSource[] | null,
+): CitationAggregate {
+  const turns: CitedTurn[] = [];
+  const fileMap = new Map<string, MentionedFile>();
+  // 청크 → 파일 키 (turns 평탄화 순서와 동일). 링크 없는 청크를 파일 링크로 채울 때 쓴다.
+  const chunkFileKeys: string[] = [];
+
+  for (const msg of (messages ?? []) as TMessage[]) {
+    if (msg.isCreatedByUser || !msg.messageId) continue;
+    const citedNs = parseCitedNumbers(messageText(msg));
+    if (citedNs.length === 0) continue;
+    const sources = resolveSources(msg.messageId);
+    if (!sources || sources.length === 0) continue;
+
+    const chunks: CitedChunk[] = [];
+    for (const n of citedNs) {
+      const source = sources[n - 1];
+      if (!source) continue;
+      const fileName = extractFileName(source);
+      const docId = sourceDocId(source);
+      const key = docId ?? fileName;
+      chunks.push({
+        messageId: msg.messageId,
+        n,
+        source,
+        fileName,
+        imanageUrl: sourceImanageUrl(source),
+      });
+      chunkFileKeys.push(key);
+      const existing = fileMap.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (!existing.imanageUrl) existing.imanageUrl = sourceImanageUrl(source);
+        if (!existing.matterUid) existing.matterUid = sourceMatterUid(source);
+      } else {
+        fileMap.set(key, {
+          key,
+          fileName,
+          docId,
+          matterUid: sourceMatterUid(source),
+          count: 1,
+          imanageUrl: sourceImanageUrl(source),
+          sample: source,
+        });
+      }
+    }
+    if (chunks.length > 0) {
+      turns.push({ messageId: msg.messageId, index: turns.length + 1, chunks });
+    }
+  }
+
+  // 파일 단위로 모은 링크를 링크 없는 청크에 되돌려 채운다 — 같은 문서의
+  // 청크 중 일부만 imanage_url 을 갖고 저장된 경우가 있다.
+  let i = 0;
+  for (const turn of turns) {
+    for (const chunk of turn.chunks) {
+      if (!chunk.imanageUrl) {
+        chunk.imanageUrl = fileMap.get(chunkFileKeys[i])?.imanageUrl ?? null;
+      }
+      i += 1;
+    }
+  }
+
+  return { turns, files: [...fileMap.values()] };
+}
+
 export function useConversationCitations(conversationId: string | null | undefined) {
   const sourcesQuery = useConversationSources(conversationId);
   // ChatView 와 같은 쿼리 키(raw 캐시 공유) — select 없이 평면 목록을 그대로 쓴다.
@@ -215,70 +294,13 @@ export function useConversationCitations(conversationId: string | null | undefin
       apiByMessage.set(row.message_id, row.sources ?? []);
     }
 
-    const turns: CitedTurn[] = [];
-    const fileMap = new Map<string, MentionedFile>();
-    // 청크 → 파일 키 (turns 평탄화 순서와 동일). 링크 없는 청크를 파일 링크로 채울 때 쓴다.
-    const chunkFileKeys: string[] = [];
-
-    for (const msg of (messages ?? []) as TMessage[]) {
-      if (msg.isCreatedByUser || !msg.messageId) continue;
-      const citedNs = parseCitedNumbers(messageText(msg));
-      if (citedNs.length === 0) continue;
-      const sources = sourcesForMessage(apiByMessage, msg.messageId);
-      if (!sources || sources.length === 0) continue;
-
-      const chunks: CitedChunk[] = [];
-      for (const n of citedNs) {
-        const source = sources[n - 1];
-        if (!source) continue;
-        const fileName = extractFileName(source);
-        const docId = sourceDocId(source);
-        const key = docId ?? fileName;
-        chunks.push({
-          messageId: msg.messageId,
-          n,
-          source,
-          fileName,
-          imanageUrl: sourceImanageUrl(source),
-        });
-        chunkFileKeys.push(key);
-        const existing = fileMap.get(key);
-        if (existing) {
-          existing.count += 1;
-          if (!existing.imanageUrl) existing.imanageUrl = sourceImanageUrl(source);
-          if (!existing.matterUid) existing.matterUid = sourceMatterUid(source);
-        } else {
-          fileMap.set(key, {
-            key,
-            fileName,
-            docId,
-            matterUid: sourceMatterUid(source),
-            count: 1,
-            imanageUrl: sourceImanageUrl(source),
-            sample: source,
-          });
-        }
-      }
-      if (chunks.length > 0) {
-        turns.push({ messageId: msg.messageId, index: turns.length + 1, chunks });
-      }
-    }
-
-    // 파일 단위로 모은 링크를 링크 없는 청크에 되돌려 채운다 — 같은 문서의
-    // 청크 중 일부만 imanage_url 을 갖고 저장된 경우가 있다.
-    let i = 0;
-    for (const turn of turns) {
-      for (const chunk of turn.chunks) {
-        if (!chunk.imanageUrl) {
-          chunk.imanageUrl = fileMap.get(chunkFileKeys[i])?.imanageUrl ?? null;
-        }
-        i += 1;
-      }
-    }
+    const { turns, files } = aggregateCitations(messages, (messageId) =>
+      sourcesForMessage(apiByMessage, messageId),
+    );
 
     return {
       turns,
-      files: [...fileMap.values()],
+      files,
       // v4 에서 disabled 쿼리는 status 'loading' 이므로 isInitialLoading 을
       // 써야 새 대화(landing)에서 "불러오는 중" 이 영영 뜨지 않는다.
       isLoading: sourcesQuery.isInitialLoading,

@@ -22,6 +22,7 @@ import { useLocalize, useDocumentTitle } from '~/hooks';
 import { BKL_APP_TITLE } from '~/components/Bkl/brand';
 import { ShareContext } from '~/Providers';
 import { ShareMessagesProvider } from './ShareMessagesProvider';
+import ShareSourcesLayout, { useShareSnapshotPrime } from './ShareSourcesPanel';
 import MessagesView from './MessagesView';
 import Footer from '../Chat/Footer';
 import { cn } from '~/utils';
@@ -32,6 +33,8 @@ function SharedView() {
   const { theme, setTheme } = useContext(ThemeContext);
   const { shareId } = useParams();
   const { data, isLoading } = useGetSharedMessages(shareId ?? '');
+  // BKL: 출처 스냅샷을 메시지 트리 렌더 전에 캐시에 심는다 (ShareSourcesPanel 참고).
+  useShareSnapshotPrime(data?.bklSources);
   const dataTree = data && buildTree({ messages: data.messages });
   const messagesTree = dataTree?.length === 0 ? null : (dataTree ?? null);
 
@@ -131,12 +134,23 @@ function SharedView() {
     </div>
   );
 
+  // BKL: 출처 스냅샷이 있으면 본문 옆에 출처 패널 (언급된 파일·인용된 청크·
+  // 코퍼스별 링크). 없으면(구 링크) 기존 그대로.
+  const mainWithSources =
+    data && data.messages ? (
+      <ShareSourcesLayout messages={data.messages} bklSources={data.bklSources}>
+        {mainContent}
+      </ShareSourcesLayout>
+    ) : (
+      mainContent
+    );
+
   const artifactsContainer =
     data && data.messages ? (
       <ShareArtifactsContainer
         messages={data.messages}
         conversationId={data.conversationId}
-        mainContent={mainContent}
+        mainContent={mainWithSources}
       />
     ) : (
       mainContent

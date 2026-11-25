@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useRecoilState } from 'recoil';
 import { ChevronLeft, FolderPlus, X } from 'lucide-react';
 import { Button } from '@librechat/client';
 import store from '~/store';
+import { ShareContext } from '~/Providers/ShareContext';
 import { cn, FileTypeIcon } from '~/utils';
 import { stripDisplayExtension } from '~/utils/fileTypeIcon';
 import { displayNameFromMeta } from '~/utils/displayName';
@@ -237,6 +238,8 @@ type BklSourcesPanelProps = {
 
 export default function BklSourcesPanel({ onBack }: BklSourcesPanelProps = {}) {
   const [active, setActive] = useRecoilState(store.activeBklSource);
+  // 공유 열람(ShareView)은 로그인 없이 보므로 프로젝트 담기를 숨긴다.
+  const { isSharedConvo } = useContext(ShareContext);
   const [sources, setSources] = useState<BklSource[] | null>(null);
   // Flips true when the 20s cache-poll below gives up without sources —
   // the panel then shows a "can't display" message instead of spinning
@@ -443,7 +446,7 @@ export default function BklSourcesPanel({ onBack }: BklSourcesPanelProps = {}) {
         </div>
         <div className="-ml-1 flex flex-wrap items-center gap-x-0.5 gap-y-1">
           <ExternalSystemButtons source={current} />
-          <AddToProjectButton source={current} />
+          {isSharedConvo ? null : <AddToProjectButton source={current} />}
         </div>
       </div>
 

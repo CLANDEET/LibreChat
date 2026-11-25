@@ -29,6 +29,36 @@ const anonymizeAssistantId = memoizedAnonymizeId('a');
 const anonymizeMessageId = (id: string) =>
   id === Constants.NO_PARENT ? id : memoizedAnonymizeId('msg')(id);
 
+/**
+ * BKL: 출처 스냅샷의 `message_id` 를 익명 메시지 id 로 바꿔 내보낸다.
+ * 공유 범위(targetMessageId 가지치기) 밖의 답변은 버리고, 서버 내부 식별자인
+ * `created_at` 은 떨어낸다. `request_id` 는 본문 `<!-- bkl_rid -->` 주석에
+ * 이미 노출되는 값이라 유지한다 (클라이언트 하이퍼링크 캐시 키).
+ */
+export function anonymizeBklSources(
+  entries: unknown,
+  idMap: ReadonlyMap<string, string>,
+): t.BklShareSourceEntry[] | null {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return null;
+  }
+  const out: t.BklShareSourceEntry[] = [];
+  for (const raw of entries) {
+    if (!raw || typeof raw !== 'object') continue;
+    const entry = raw as Partial<t.BklShareSourceEntry>;
+    const anonId = entry.message_id ? idMap.get(entry.message_id) : undefined;
+    if (!anonId) continue;
+    out.push({
+      request_id: entry.request_id ?? null,
+      message_id: anonId,
+      sources: Array.isArray(entry.sources) ? entry.sources : [],
+      hyperlink_map:
+        entry.hyperlink_map && typeof entry.hyperlink_map === 'object' ? entry.hyperlink_map : null,
+    });
+  }
+  return out.length > 0 ? out : null;
+}
+
 function anonymizeConvo(conversation: Partial<t.IConversation> & Partial<t.ISharedLink>) {
   if (!conversation) {
     return null;
@@ -41,12 +71,15 @@ function anonymizeConvo(conversation: Partial<t.IConversation> & Partial<t.IShar
   return newConvo;
 }
 
-function anonymizeMessages(messages: t.IMessage[], newConvoId: string): t.IMessage[] {
+function anonymizeMessages(
+  messages: t.IMessage[],
+  newConvoId: string,
+  idMap: Map<string, string> = new Map<string, string>(),
+): t.IMessage[] {
   if (!Array.isArray(messages)) {
     return [];
   }
 
-  const idMap = new Map<string, string>();
   return messages.map((message) => {
     const newMessageId = anonymizeMessageId(message.messageId);
     idMap.set(message.messageId, newMessageId);
@@ -180,6 +213,9 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
       }
 
       const newConvoId = anonymizeConvoId(share.conversationId);
+      // BKL: 메시지 익명화 때 만든 원본→익명 id 맵을 출처 스냅샷에도 적용한다.
+      // 익명 id 는 호출마다 새로 뽑히므로 같은 맵을 써야 본문과 출처가 맞물린다.
+      const idMap = new Map<string, string>();
       const result: t.SharedMessagesResult = {
         shareId: share.shareId || shareId,
         title: share.title,
@@ -187,7 +223,8 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         createdAt: share.createdAt,
         updatedAt: share.updatedAt,
         conversationId: newConvoId,
-        messages: anonymizeMessages(messagesToShare, newConvoId),
+        messages: anonymizeMessages(messagesToShare, newConvoId, idMap),
+        bklSources: anonymizeBklSources(share.bklSources, idMap),
       };
 
       return result;

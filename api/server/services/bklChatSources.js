@@ -64,4 +64,45 @@ async function remapBklChatSources(idMapping, conversationId) {
   }
 }
 
-module.exports = { remapBklChatSources };
+/**
+ * BKL: 공유 링크 생성 시점의 출처 스냅샷.
+ *
+ * ai-api `GET /v1/sources/by-conversation/{conversationId}` 의 `messages[]`
+ * ({request_id, message_id, sources, hyperlink_map}) 를 그대로 돌려준다.
+ * 공유 열람자는 로그인/ACL 없이 이 스냅샷만 보므로, 공유자 권한으로 조회된
+ * 결과가 곧 공유 범위다 ("공유 텍스트 기준 그대로" 방침, 2026-11-25).
+ *
+ * `conversationId` 는 **원본** id 여야 한다 — 공유 조회 응답의 conversationId
+ * 는 익명화된 값이다. Best-effort: 실패해도 공유 생성은 성공시킨다.
+ *
+ * @param {string} conversationId - 원본 대화 id
+ * @returns {Promise<unknown[] | null>} messages[] 또는 null
+ */
+async function snapshotBklChatSources(conversationId) {
+  if (!conversationId) {
+    return null;
+  }
+  if (!BKL_API_TOKEN) {
+    logger.warn('[bklChatSources] IRE_API_TOKEN is not set — skipping share source snapshot');
+    return null;
+  }
+  try {
+    const response = await axios.get(
+      `${BKL_BASE_URL}/v1/sources/by-conversation/${encodeURIComponent(conversationId)}`,
+      {
+        headers: { Authorization: `Bearer ${BKL_API_TOKEN}` },
+        timeout: 15_000,
+      },
+    );
+    const messages = response.data?.messages;
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return null;
+    }
+    return messages;
+  } catch (err) {
+    logger.warn('[bklChatSources] Failed to snapshot share sources:', err?.message || err);
+    return null;
+  }
+}
+
+module.exports = { remapBklChatSources, snapshotBklChatSources };
