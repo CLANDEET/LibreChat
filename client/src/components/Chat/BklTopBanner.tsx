@@ -6,7 +6,7 @@ import store from '~/store';
 import { cn } from '~/utils';
 
 /**
- * BKL: 상단 안내 banner — BKL Prism 정식 출시 예정 안내와 검색 범위(2026.09.30 까지 종결 사건) 명시.
+ * BKL: 상단 안내 banner — BKL Prism 정식 출시 예정 안내와 검색 범위(2026.10.31 까지 종결 사건) 명시.
  *
  *   디자인:
  *     - 단색 amber tint (그라데이션 없음 — 사용자 피드백). 좌측 Info 아이콘 + 본문 + 우측 X.
