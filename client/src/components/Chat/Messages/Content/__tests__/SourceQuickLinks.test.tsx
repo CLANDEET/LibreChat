@@ -53,7 +53,7 @@ describe('SourceQuickLinks', () => {
         source={src({ doc_id: 'd3', source_library: 'LIB' }, { url: '/v1/source-files/d3' })}
       />,
     );
-    expect(screen.getByLabelText('도서관 원문 보기')).toHaveAttribute(
+    expect(screen.getByLabelText('도서실 원문 보기')).toHaveAttribute(
       'href',
       '/v1/source-files/d3',
     );

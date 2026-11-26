@@ -134,8 +134,8 @@ export const BKL_FLOW_LABELS: Record<string, string> = {
   flow5: '정밀 재순위',
   knowledge_db: 'DB 라이브러리',
   flow6: 'DB 라이브러리',
-  library: '도서관',
-  flow7: '도서관',
+  library: '도서실',
+  flow7: '도서실',
 };
 
 export function bklFlowLabel(flow: string): string {

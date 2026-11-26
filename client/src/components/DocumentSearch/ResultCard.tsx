@@ -341,7 +341,7 @@ const ResultCard: React.FC<ResultCardProps> = ({
         )}
         {isLibrary && (
           <span className="shrink-0 rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
-            도서관
+            도서실
           </span>
         )}
         {hit.title_match && (

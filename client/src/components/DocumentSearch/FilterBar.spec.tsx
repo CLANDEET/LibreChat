@@ -119,7 +119,7 @@ describe('FilterBar 매터 선택', () => {
       ...EMPTY_DOC_FILTERS,
       matters: [{ matter_uid: '1001', label: '2024가합100' }],
     });
-    fireEvent.click(screen.getByRole('radio', { name: '도서관' }));
+    fireEvent.click(screen.getByRole('radio', { name: '도서실' }));
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ library: 'booklib', matters: [] }),
     );
