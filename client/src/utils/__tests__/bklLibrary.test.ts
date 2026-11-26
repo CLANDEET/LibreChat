@@ -14,7 +14,7 @@ describe('bklLibrary', () => {
       'knowledge',
       'booklib',
     ]);
-    expect(libraryFilterLabel('booklib')).toBe('도서관');
+    expect(libraryFilterLabel('booklib')).toBe('도서실');
     expect(libraryFilterLabel('knowledge')).toBe('DB 라이브러리');
     expect(libraryFilterLabel('matter')).toBe('M 라이브러리');
     expect(libraryFilterLabel(undefined)).toBe('M 라이브러리');

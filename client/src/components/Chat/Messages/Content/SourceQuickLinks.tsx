@@ -104,7 +104,7 @@ export function SourceQuickLinksView({
         <LinkItem
           href={links.viewer}
           label="원문 뷰어"
-          title="도서관 원문 보기"
+          title="도서실 원문 보기"
           icon={<BookOpen size={size} aria-hidden="true" />}
           variant={variant}
           loading={links.loading}

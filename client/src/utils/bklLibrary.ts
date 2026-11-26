@@ -17,7 +17,7 @@ export const LIBRARY_FILTER_OPTIONS: { id: LibraryFilter; label: string; short: 
   { id: 'all', label: '전체', short: '전체' },
   { id: 'matter', label: 'M 라이브러리', short: 'M' },
   { id: 'knowledge', label: 'DB 라이브러리', short: 'DB' },
-  { id: 'booklib', label: '도서관', short: '도서관' },
+  { id: 'booklib', label: '도서실', short: '도서실' },
 ];
 
 export function libraryFilterLabel(value: string | null | undefined): string {
