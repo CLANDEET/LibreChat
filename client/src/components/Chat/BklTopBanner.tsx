@@ -6,7 +6,7 @@ import store from '~/store';
 import { cn } from '~/utils';
 
 /**
- * BKL: 상단 안내 banner — BKL Prism 정식 출시 예정 안내와 검색 범위(2026.09.30 까지 종결 사건) 명시.
+ * BKL: 상단 안내 banner — BKL Prism 정식 출시 예정 안내와 검색 범위(2026.10.31 까지 종결 사건) 명시.
  *
  *   디자인:
  *     - 단색 amber tint (그라데이션 없음 — 사용자 피드백). 좌측 Info 아이콘 + 본문 + 우측 X.
@@ -49,7 +49,7 @@ export default function BklTopBanner() {
           <div className="mt-0.5 text-amber-800 dark:text-amber-200">
             <p>
               본 서비스는 정식 출시를 앞두고 있으며,{' '}
-              <span className="font-bold underline">2026년 9월 말(2026.09.30)까지 종결된 사건</span>
+              <span className="font-bold underline">2026년 10월 말(2026.10.31)까지 종결된 사건</span>
               에 한해 검색이 제공됩니다.
             </p>
             <p className="mt-0.5 sm:mt-0">

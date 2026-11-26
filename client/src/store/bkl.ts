@@ -100,7 +100,9 @@ export const selectedBklMatters = atom<BklMatterSelection[]>({
 
 export const referenceBklMatters = selectedBklMatters;
 
-const TOP_BANNER_KEY = 'bkl_top_banner_dismissed_v1';
+// 공지 내용이 바뀌면 버전을 올린다 — 이전 공지를 닫은 사용자에게 다시 보이도록.
+// v2: 검색 가능 기간 9월 말 → 10월 말 (2026-11-26)
+const TOP_BANNER_KEY = 'bkl_top_banner_dismissed_v2';
 
 const readBannerInitial = (): boolean => {
   if (typeof localStorage === 'undefined') return false;
