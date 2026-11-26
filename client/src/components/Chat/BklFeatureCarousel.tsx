@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
+  Telescope,
   AtSign,
   Filter,
   Sparkles,
@@ -15,7 +16,8 @@ import { cn } from '~/utils';
  * BKL: 랜딩 페이지 (NEW 대화) 입력창 아래에 표시되는 기능 안내 carousel.
  *
  *   사용자 요청: "@ 기능 / 기간필터 / 쿼리강화 / 좌측 문서검색 4개 + 1-2개 추가".
- *   추가 카드: 인용 출처 확인, iManage 연동. 총 6개.
+ *   추가 카드: 인용 출처 확인, iManage 연동. 2026-11-26 딥 서치 카드 추가, 순서를
+ *   딥 서치 → 필터 → 쿼리 강화 → 사건 참조 → … 로 변경. 총 7개.
  *
  *   디자인: 가로 scroll-snap carousel + 좌우 화살표. 깔끔하고 미니멀.
  */
@@ -29,11 +31,11 @@ interface FeatureCard {
 
 const FEATURES: FeatureCard[] = [
   {
-    icon: <AtSign className="h-5 w-5" />,
-    title: '사건 참조',
+    icon: <Telescope className="h-5 w-5" />,
+    title: '딥 서치',
     description:
-      '채팅 입력 첫머리에 @ 를 입력하면 사건을 참조할 수 있습니다. 참조된 사건은 쿼리 강화의 컨텍스트로 활용됩니다.',
-    hint: '줄 첫머리에 @ → 사건 검색',
+      '입력바의 딥 서치 토글을 켜면 자료를 더 넓게 여러 차례 다시 찾아 답변합니다. 답변까지 최대 5분 정도 걸릴 수 있습니다.',
+    hint: '놓친 자료가 있을 것 같을 때',
   },
   {
     icon: <Filter className="h-5 w-5" />,
@@ -48,6 +50,13 @@ const FEATURES: FeatureCard[] = [
     description:
       '쿼리 작성이 막막할 때, 토글을 켜고 메시지를 보내면 LLM 이 후보 쿼리 3개를 제안합니다.',
     hint: '쿼리 작성에 어려움이 있을 때',
+  },
+  {
+    icon: <AtSign className="h-5 w-5" />,
+    title: '사건 참조',
+    description:
+      '채팅 입력 첫머리에 @ 를 입력하면 사건을 참조할 수 있습니다. 참조된 사건은 쿼리 강화의 컨텍스트로 활용됩니다.',
+    hint: '줄 첫머리에 @ → 사건 검색',
   },
   {
     icon: <FileSearch className="h-5 w-5" />,
@@ -105,9 +114,7 @@ export default function BklFeatureCarousel() {
     // BKL: 입력창과 동일 폭 (max-w-3xl / xl:max-w-4xl).
     <div className="mx-auto mt-4 w-full max-w-3xl px-2 xl:max-w-4xl">
       <div className="mb-2 flex items-center justify-between px-1">
-        <p className="text-xs font-medium text-text-tertiary">
-          시작하기 — 핵심 기능 안내
-        </p>
+        <p className="text-xs font-medium text-text-tertiary">시작하기 — 핵심 기능 안내</p>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -168,9 +175,7 @@ export default function BklFeatureCarousel() {
               {f.description}
             </p>
             {f.hint && (
-              <p className="mt-auto truncate text-[11px] italic text-text-tertiary">
-                {f.hint}
-              </p>
+              <p className="mt-auto truncate text-[11px] italic text-text-tertiary">{f.hint}</p>
             )}
           </article>
         ))}
