@@ -32,7 +32,6 @@ import BklMatterChips from './BklMatterChips';
 import BklActiveFilterChips from './BklActiveFilterChips';
 import TextareaHeader from './TextareaHeader';
 import PromptsCommand from './PromptsCommand';
-import AudioRecorder from './AudioRecorder';
 import CollapseChat from './CollapseChat';
 import StreamAudio from './StreamAudio';
 import StopButton from './StopButton';
@@ -56,7 +55,6 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
   const [isFormHovered, setIsFormHovered] = useState(false);
   const [isToolbarFocused, setIsToolbarFocused] = useState(false);
 
-  const SpeechToText = useRecoilValue(store.speechToText);
   const TextToSpeech = useRecoilValue(store.textToSpeech);
   const chatDirection = useRecoilValue(store.chatDirection);
   const automaticPlayback = useRecoilValue(store.automaticPlayback);
@@ -331,15 +329,8 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
         isInChat={isInChat}
       />
       <div className="mx-auto flex" />
-      {SpeechToText && (
-        <AudioRecorder
-          methods={methods}
-          ask={submitMessage}
-          textAreaRef={textAreaRef}
-          disabled={disableInputs || isNotAppendable}
-          isSubmitting={isSubmitting}
-        />
-      )}
+      {/* BKL: 마이크(음성 입력) 버튼 제거 — Prism 은 음성 입력을 지원하지 않는다.
+          브라우저 Web Speech 는 사내망에서 동작하지 않고, 설정 메뉴가 없어 사용자가 끌 수도 없다. */}
       {!isInChat && <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>{sendControl}</div>}
     </div>
   );
