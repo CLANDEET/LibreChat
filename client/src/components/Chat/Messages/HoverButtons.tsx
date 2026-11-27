@@ -1,7 +1,7 @@
 import React, { useState, useMemo, memo } from 'react';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
-import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
-import { useGenerationsByLatest, useLocalize } from '~/hooks';
+import { Clipboard, CheckMark } from '@librechat/client';
+import { useLocalize } from '~/hooks';
 import GuidedRetryInput from './GuidedRetryInput';
 import Feedback from './Feedback';
 import { cn } from '~/utils';
@@ -109,15 +109,10 @@ const SearchRetryIcon = () => (
 );
 
 const HoverButtons = ({
-  isEditing,
-  enterEdit,
   copyToClipboard,
   conversation,
   isSubmitting,
   message,
-  regenerate,
-  handleContinue,
-  latestMessageId,
   isLast,
   handleFeedback,
 }: THoverButtons) => {
@@ -127,65 +122,24 @@ const HoverButtons = ({
 
   const bklRid = useMemo(() => extractBklRid(message), [message]);
 
-  const endpoint = useMemo(() => {
-    if (!conversation) {
-      return '';
-    }
-    return conversation.endpointType ?? conversation.endpoint;
-  }, [conversation]);
-
-  const generationCapabilities = useGenerationsByLatest({
-    isEditing,
-    isSubmitting,
-    error: message.error,
-    endpoint: endpoint ?? '',
-    messageId: message.messageId,
-    searchResult: message.searchResult,
-    finish_reason: message.finish_reason,
-    isCreatedByUser: message.isCreatedByUser,
-    latestMessageId: latestMessageId,
-  });
-
-  const { hideEditButton, regenerateEnabled, continueSupported, isEditableEndpoint } =
-    generationCapabilities;
-
   if (!conversation) {
     return null;
   }
 
   const { isCreatedByUser, error } = message;
 
+  // BKL: 오류 답변에는 재생성만 있었는데 재생성도 뺐으므로 아무것도 표시하지 않는다.
   if (error === true) {
-    return (
-      <div className="visible flex justify-center self-end lg:justify-start">
-        {regenerateEnabled && (
-          <HoverButton
-            onClick={regenerate}
-            title={localize('com_ui_regenerate')}
-            icon={<RegenerateIcon size="19" />}
-            isLast={isLast}
-          />
-        )}
-      </div>
-    );
+    return null;
   }
-
-  const onEdit = () => {
-    if (isEditing) {
-      return enterEdit(true);
-    }
-    enterEdit();
-  };
 
   const handleCopy = () => copyToClipboard(setIsCopied);
 
   return (
     <div className="relative">
       <div className="group visible flex justify-center gap-0.5 self-end focus-within:outline-none lg:justify-start">
-        {/* BKL: 읽어주기(TTS)·포크 버튼 제거, 편집은 내 질문에만.
-            Prism 은 음성 기능을 지원하지 않고(설정 메뉴도 없어 끌 수 없음), 대화 포크는
-            법률 Q&A 에서 혼란만 주며, AI 답변 본문 편집은 기록을 바꾸는 기능이라 뺐다.
-            남는 것: 복사 · 편집(내 질문) · 👍👎 · 검색 보완하기 · 재생성 · 계속(잘린 답변만). */}
+        {/* BKL: 읽어주기(TTS)·편집·포크·재생성·계속 버튼 제거 (2026-11-27).
+            Prism 에서 쓰지 않는 기능들. 남는 것: 복사 · 👍👎 · 검색 보완하기. */}
 
         {/* Copy Button */}
         <HoverButton
@@ -201,21 +155,6 @@ const HoverButtons = ({
           )}
         />
 
-        {/* Edit Button — 내 질문만 (질문 수정 후 재전송) */}
-        {isCreatedByUser && isEditableEndpoint && (
-          <HoverButton
-            id={`edit-${message.messageId}`}
-            onClick={onEdit}
-            title={localize('com_ui_edit')}
-            icon={<EditIcon size="19" />}
-            isActive={isEditing}
-            isVisible={!hideEditButton}
-            isDisabled={hideEditButton}
-            isLast={isLast}
-            className={isCreatedByUser ? '' : 'active'}
-          />
-        )}
-
         {/* Feedback Buttons */}
         {!isCreatedByUser && handleFeedback != null && (
           <Feedback handleFeedback={handleFeedback} feedback={message.feedback} isLast={isLast} />
@@ -230,28 +169,6 @@ const HoverButtons = ({
             isActive={showGuidedRetry}
             isLast={isLast}
             className={showGuidedRetry ? 'text-green-500' : ''}
-          />
-        )}
-
-        {/* Regenerate Button */}
-        {regenerateEnabled && (
-          <HoverButton
-            onClick={regenerate}
-            title={localize('com_ui_regenerate')}
-            icon={<RegenerateIcon size="19" />}
-            isLast={isLast}
-            className="active"
-          />
-        )}
-
-        {/* Continue Button */}
-        {continueSupported && (
-          <HoverButton
-            onClick={(e) => e && handleContinue(e)}
-            title={localize('com_ui_continue')}
-            icon={<ContinueIcon className="w-19 h-19 -rotate-180" />}
-            isLast={isLast}
-            className="active"
           />
         )}
       </div>
