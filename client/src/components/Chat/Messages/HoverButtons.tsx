@@ -1,14 +1,10 @@
 import React, { useState, useMemo, memo } from 'react';
-import { useRecoilState } from 'recoil';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
 import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
-import { Fork } from '~/components/Conversations';
 import GuidedRetryInput from './GuidedRetryInput';
-import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
 import { cn } from '~/utils';
-import store from '~/store';
 
 type THoverButtons = {
   isEditing: boolean;
@@ -36,38 +32,6 @@ type HoverButtonProps = {
   isLast?: boolean;
   className?: string;
   buttonStyle?: string;
-};
-
-const extractMessageContent = (message: TMessage): string => {
-  if (typeof message.content === 'string') {
-    return message.content;
-  }
-
-  if (Array.isArray(message.content)) {
-    return message.content
-      .map((part) => {
-        if (part == null) {
-          return '';
-        }
-        if (typeof part === 'string') {
-          return part;
-        }
-        if ('text' in part) {
-          return part.text || '';
-        }
-        if ('think' in part) {
-          const think = part.think;
-          if (typeof think === 'string') {
-            return think;
-          }
-          return think && 'text' in think ? think.text || '' : '';
-        }
-        return '';
-      })
-      .join('');
-  }
-
-  return message.text || '';
 };
 
 const HoverButton = memo(
@@ -127,7 +91,16 @@ function extractBklRid(message: TMessage): string | null {
 }
 
 const SearchRetryIcon = () => (
-  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="19"
+    height="19"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <circle cx="11" cy="11" r="8" />
     <path d="m21 21-4.3-4.3" />
     <path d="M11 8v6" />
@@ -136,7 +109,6 @@ const SearchRetryIcon = () => (
 );
 
 const HoverButtons = ({
-  index,
   isEditing,
   enterEdit,
   copyToClipboard,
@@ -152,7 +124,6 @@ const HoverButtons = ({
   const localize = useLocalize();
   const [isCopied, setIsCopied] = useState(false);
   const [showGuidedRetry, setShowGuidedRetry] = useState(false);
-  const [TextToSpeech] = useRecoilState<boolean>(store.textToSpeech);
 
   const bklRid = useMemo(() => extractBklRid(message), [message]);
 
@@ -175,13 +146,8 @@ const HoverButtons = ({
     latestMessageId: latestMessageId,
   });
 
-  const {
-    hideEditButton,
-    regenerateEnabled,
-    continueSupported,
-    forkingSupported,
-    isEditableEndpoint,
-  } = generationCapabilities;
+  const { hideEditButton, regenerateEnabled, continueSupported, isEditableEndpoint } =
+    generationCapabilities;
 
   if (!conversation) {
     return null;
@@ -216,24 +182,10 @@ const HoverButtons = ({
   return (
     <div className="relative">
       <div className="group visible flex justify-center gap-0.5 self-end focus-within:outline-none lg:justify-start">
-        {/* Text to Speech */}
-        {TextToSpeech && (
-          <MessageAudio
-            index={index}
-            isLast={isLast}
-            messageId={message.messageId}
-            content={extractMessageContent(message)}
-            renderButton={(props) => (
-              <HoverButton
-                onClick={props.onClick}
-                title={props.title}
-                icon={props.icon}
-                isActive={props.isActive}
-                isLast={isLast}
-              />
-            )}
-          />
-        )}
+        {/* BKL: 읽어주기(TTS)·포크 버튼 제거, 편집은 내 질문에만.
+            Prism 은 음성 기능을 지원하지 않고(설정 메뉴도 없어 끌 수 없음), 대화 포크는
+            법률 Q&A 에서 혼란만 주며, AI 답변 본문 편집은 기록을 바꾸는 기능이라 뺐다.
+            남는 것: 복사 · 편집(내 질문) · 👍👎 · 검색 보완하기 · 재생성 · 계속(잘린 답변만). */}
 
         {/* Copy Button */}
         <HoverButton
@@ -249,8 +201,8 @@ const HoverButtons = ({
           )}
         />
 
-        {/* Edit Button */}
-        {isEditableEndpoint && (
+        {/* Edit Button — 내 질문만 (질문 수정 후 재전송) */}
+        {isCreatedByUser && isEditableEndpoint && (
           <HoverButton
             id={`edit-${message.messageId}`}
             onClick={onEdit}
@@ -263,15 +215,6 @@ const HoverButtons = ({
             className={isCreatedByUser ? '' : 'active'}
           />
         )}
-
-        {/* Fork Button */}
-        <Fork
-          messageId={message.messageId}
-          conversationId={conversation.conversationId}
-          forkingSupported={forkingSupported}
-          latestMessageId={latestMessageId}
-          isLast={isLast}
-        />
 
         {/* Feedback Buttons */}
         {!isCreatedByUser && handleFeedback != null && (
